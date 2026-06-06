@@ -1,0 +1,258 @@
+#pragma once
+#include "../Unity/Vector3.h"
+#include "UTF8.h"
+
+
+
+struct Vector4_2 {
+    float X;
+    float Y;
+    float Z;
+    float W;
+};
+
+struct Matrix {
+    Vector4_2 Position;
+    Vector4_2 Rotation;
+    Vector4_2 Scale;
+};
+
+struct UnityMatrix {
+    float _11, _12, _13, _14;
+    float _21, _22, _23, _24;
+    float _31, _32, _33, _34;
+    float _41, _42, _43, _44;
+};
+
+std::string ObterStr(uintptr_t address, int count) {
+    uintptr_t classname;
+    int m = 0;
+    char a[500];
+    char buf88[256] = "";
+    UTF16 buf16[34] = { 0 };
+    uintptr_t hex[2] = { 0 };
+    for (int i = 0; i < count; i++)
+    {
+        classname = Ler<uintptr_t>(address + i * 4);
+        hex[0] = (classname & 0xfffff000) >> 16;
+        hex[1] = classname & 0xffff;
+        buf16[m] = static_cast<UTF16>(hex[1]);
+        buf16[m + 1] = static_cast<UTF16>(hex[0]);
+        m += 2;
+    }
+    Utf16_To_Utf8(buf16, reinterpret_cast<UTF8*>(buf88), sizeof(buf88), strictConversion);
+    sprintf_s(a, "%s", buf88);
+    return a;
+}
+
+inline Vector3 Transform_ObterPosicao(uintptr_t Transform) {
+    uintptr_t TransformAcess = Ler<uintptr_t>(Transform + string2Offset(AY_OBFUSCATE("0x8")));
+    int TransformIndex = Ler<int>(TransformAcess + string2Offset(AY_OBFUSCATE("0x24")));
+    uintptr_t TransformMatrix = Ler<uintptr_t>(TransformAcess + string2Offset(AY_OBFUSCATE("0x20")));
+    uintptr_t pTransformValues = Ler<uintptr_t>(TransformMatrix + string2Offset(AY_OBFUSCATE("0x18")));
+    uintptr_t offsetPosition = string2Offset(AY_OBFUSCATE("0x30")) * static_cast<uintptr_t>(TransformIndex);
+    Vector3 ResultPosition = Ler<Vector3>(pTransformValues + offsetPosition);
+    uintptr_t pOffsetCount = Ler<uintptr_t>(TransformMatrix + string2Offset(AY_OBFUSCATE("0x1C")));
+    int IndexTransform = Ler<int>(pOffsetCount + string2Offset(AY_OBFUSCATE("0x4")) * TransformIndex);
+    int curIndex = 0;
+    while (IndexTransform >= 0) {
+        curIndex++;
+        if (curIndex >= 60) {
+            return ResultPosition;
+        }
+
+        Matrix matriz = Ler<Matrix>(pTransformValues + sizeof(Matrix) * IndexTransform);
+
+        float RotationX = matriz.Rotation.X;
+        float RotationY = matriz.Rotation.Y;
+        float RotationZ = matriz.Rotation.Z;
+        float RotationW = matriz.Rotation.W;
+
+        float ScaleX = ResultPosition.X * matriz.Scale.X;
+        float ScaleY = ResultPosition.Y * matriz.Scale.Y;
+        float ScaleZ = ResultPosition.Z * matriz.Scale.Z;
+
+        ResultPosition.X = matriz.Position.X + ScaleX + (ScaleX * ((RotationY * RotationY * -2.0f) - (RotationZ * RotationZ * 2.0f))) + (ScaleY * ((RotationW * RotationZ * -2.0f) - (RotationY * RotationX * -2.0f))) + (ScaleZ * ((RotationZ * RotationX * 2.0f) - (RotationW * RotationY * -2.0f)));
+        ResultPosition.Y = matriz.Position.Y + ScaleY + (ScaleX * ((RotationX * RotationY * 2.0f) - (RotationW * RotationZ * -2.0f))) + (ScaleY * ((RotationZ * RotationZ * -2.0f) - (RotationX * RotationX * 2.0f))) + (ScaleZ * ((RotationW * RotationX * -2.0f) - (RotationZ * RotationY * -2.0f)));
+        ResultPosition.Z = matriz.Position.Z + ScaleZ + (ScaleX * ((RotationW * RotationY * -2.0f) - (RotationX * RotationZ * -2.0f))) + (ScaleY * ((RotationY * RotationZ * 2.0f) - (RotationW * RotationX * -2.0f))) + (ScaleZ * ((RotationX * RotationX * -2.0f) - (RotationY * RotationY * 2.0f)));
+
+        IndexTransform = Ler<int>(pOffsetCount + string2Offset(AY_OBFUSCATE("0x4")) * IndexTransform);
+    }
+    return ResultPosition;
+}
+
+void Transform_DefinirPosicao(uintptr_t Transform, Vector3 NovaPosicao) {
+    uintptr_t TransformAcess = Ler<uintptr_t>(Transform + string2Offset(AY_OBFUSCATE("0x8")));
+    int TransformIndex = Ler<int>(TransformAcess + string2Offset(AY_OBFUSCATE("0x24")));
+    uintptr_t pTransformValues = Ler<uintptr_t>(Ler<uintptr_t>(TransformAcess + string2Offset(AY_OBFUSCATE("0x20"))) + string2Offset(AY_OBFUSCATE("0x18")));
+    uintptr_t offsetPosition = string2Offset(AY_OBFUSCATE("0x30")) * static_cast<uintptr_t>(TransformIndex);
+    Escrever<Vector3>(pTransformValues + offsetPosition, NovaPosicao);
+}
+
+auto GetPlayerPosition = [](uintptr_t player, int positionType) -> Vector3 {
+    if (positionType == 0) {
+        uintptr_t m_CachedTransform = Ler<uintptr_t>(player + Offsets::MainTransform);
+        if (m_CachedTransform == 0) return Vector3{ 0, 0, 0 };
+
+        return Transform_ObterPosicao(m_CachedTransform);
+    }
+
+    if (positionType == 1) {
+        uintptr_t OLCJOGDHJJJ5 = Ler<uintptr_t>(player + Offsets::MainTransform);
+        if (OLCJOGDHJJJ5 == 0) return Vector3{ 0, 0, 0 };
+
+        uintptr_t TFNode = Ler<uintptr_t>(OLCJOGDHJJJ5 + string2Offset(AY_OBFUSCATE("0x8")));
+        if (TFNode == 0) return Vector3{ 0, 0, 0 };
+
+        return Transform_ObterPosicao(TFNode);
+    }
+    return Vector3{ 0, 0, 0 };
+    };
+
+Vector3 ObterOssos(uintptr_t Player, uintptr_t Position) {
+    uintptr_t ListTransform = Ler<uintptr_t>(Player + Offsets::AIDDOCAPFKA);
+    if (ListTransform != string2Offset(AY_OBFUSCATE("0")))
+    {
+        uintptr_t Transform = Ler<uintptr_t>(ListTransform + string2Offset(AY_OBFUSCATE("0x8")));
+        if (Transform != string2Offset(AY_OBFUSCATE("0")))
+        {
+            uintptr_t Location = Ler<uintptr_t>(Transform + Position);
+            if (Location != string2Offset(AY_OBFUSCATE("0")))
+            {
+                uintptr_t H1 = Ler<uintptr_t>(Location + string2Offset(AY_OBFUSCATE("0x8")));
+                if (H1 != string2Offset(AY_OBFUSCATE("0")))
+                {
+                    uintptr_t H2 = Ler<uintptr_t>(H1 + string2Offset(AY_OBFUSCATE("0x28")));
+                    if (H2 != string2Offset(AY_OBFUSCATE("0")))
+                    {
+                        uintptr_t H3 = Ler<uintptr_t>(H2 + string2Offset(AY_OBFUSCATE("0x14")));
+                        if (H3 != string2Offset(AY_OBFUSCATE("0")))
+                        {
+                            uintptr_t H4 = H3 + string2Offset(AY_OBFUSCATE("0x60"));
+                            if (H4 != string2Offset(AY_OBFUSCATE("0")))
+                            {
+                                return Ler<Vector3>(H4);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return Vector3(0,0,0);
+}
+
+Vector3 GetBonePositionV2(uintptr_t player, uintptr_t boneOffset) {
+    uintptr_t Location = Ler<uintptr_t>(player + boneOffset);
+    if (Location == 0 || Location < 0x10000) return Vector3{0, 0, 0};
+    uintptr_t H1 = Ler<uintptr_t>(Location + string2Offset(AY_OBFUSCATE("0x8")));
+    if (H1 == 0 || H1 < 0x10000) return Vector3{0, 0, 0};
+    uintptr_t H2 = Ler<uintptr_t>(H1 + Offsets::Bones::Node_WorldPos);
+    if (H2 == 0 || H2 < 0x10000) return Vector3{0, 0, 0};
+    uintptr_t H3 = Ler<uintptr_t>(H2 + string2Offset(AY_OBFUSCATE("0x14")));
+    if (H3 == 0 || H3 < 0x10000) return Vector3{0, 0, 0};
+    return Ler<Vector3>(H3 + string2Offset(AY_OBFUSCATE("0x60")));
+}
+
+Vector3 GetHeadPosition(uintptr_t Entidade) {
+    static uintptr_t posHead = 0;
+    bool Garota = Ler<bool>(Entidade + Offsets::CDOBMFNCJHD);
+    if (Garota) {
+        posHead = string2Offset(AY_OBFUSCATE("0x3C"));
+    }
+    else {
+        posHead = string2Offset(AY_OBFUSCATE("0x38"));
+    }
+    uintptr_t ListTransform = Ler<uintptr_t>(Entidade + Offsets::AIDDOCAPFKA);
+    if (ListTransform != string2Offset(AY_OBFUSCATE("0"))) {
+        uintptr_t Transform = Ler<uintptr_t>(ListTransform + string2Offset(AY_OBFUSCATE("0x8")));
+        if (Transform != string2Offset(AY_OBFUSCATE("0"))) {
+            uintptr_t Location = Ler<uintptr_t>(Transform + posHead);
+            if (Location != string2Offset(AY_OBFUSCATE("0"))) {
+                uintptr_t H1 = Ler<uintptr_t>(Location + string2Offset(AY_OBFUSCATE("0x8")));
+                if (H1 != string2Offset(AY_OBFUSCATE("0"))) {
+                    uintptr_t H2 = Ler<uintptr_t>(H1 + string2Offset(AY_OBFUSCATE("0x28")));
+                    if (H2 != string2Offset(AY_OBFUSCATE("0"))) {
+                        uintptr_t H3 = Ler<uintptr_t>(H2 + string2Offset(AY_OBFUSCATE("0x14")));
+                        if (H3 != string2Offset(AY_OBFUSCATE("0"))) {
+                            uintptr_t H4 = H3 + string2Offset(AY_OBFUSCATE("0x60"));
+                            if (H4 != string2Offset(AY_OBFUSCATE("0"))) {
+                                return Ler<Vector3>(H4);
+                            }
+                        }
+                        else {
+                            return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+                        }
+                    }
+                    else {
+                        return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+                    }
+                }
+                else {
+                    return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+                }
+            }
+            else {
+                return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+            }
+        }
+        else {
+            return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+        }
+    }
+    else {
+        return Transform_ObterPosicao(Ler<uintptr_t>(Ler<uintptr_t>(Entidade + Offsets::MainTransform) + string2Offset(AY_OBFUSCATE("0x8"))));
+    }
+    return Vector3(0, 0, 0);
+}
+
+struct Vector3 World2Screen(struct UnityMatrix viewMatrix, struct Vector3 pos) {
+    struct Vector3 screen;
+    float screenW = (viewMatrix._14 * pos.X) + (viewMatrix._24 * pos.Y) + (viewMatrix._34 * pos.Z) + viewMatrix._44;
+
+    if (screenW < 0.01f)
+        screen.Z = 1.0f;
+    else
+        screen.Z = 0.0f;
+
+    float screenX = (viewMatrix._11 * pos.X) + (viewMatrix._21 * pos.Y) + (viewMatrix._31 * pos.Z) + viewMatrix._41;
+    float screenY = (viewMatrix._12 * pos.X) + (viewMatrix._22 * pos.Y) + (viewMatrix._32 * pos.Z) + viewMatrix._42;
+    screen.Y = static_cast<float>(SHeight / 2) - static_cast<float>(SHeight / 2) * screenY / screenW;
+    screen.X = static_cast<float>(SWidth / 2) + static_cast<float>(SWidth / 2) * screenX / screenW;
+
+    return screen;
+}
+
+bool isInsideFov(int x, int y) {
+    int circle_x = SWidth / 2;
+    int circle_y = SHeight / 2;
+    int rad = 180 * 8;
+    return (x - circle_x) * (x - circle_x) + (y - circle_y) * (y - circle_y) <= rad * rad;
+}
+
+void NetworkInit() {
+    std::cout << "[NetworkInit] Iniciando conexao com emulador..." << std::endl;
+    if (ConnectEmulator()) {
+        std::cout << "[NetworkInit] Emulador conectado! Procurando libs..." << std::endl;
+        while (il2cpp == 0 || libunity == 0) {
+            if (il2cpp == 0) {
+                il2cpp = ObterEnderecoDaBiblioteca(AY_OBFUSCATE("libil2cpp.so"));
+                if (il2cpp != 0)
+                    std::cout << "[NetworkInit] libil2cpp.so: 0x" << std::hex << il2cpp << std::endl;
+            }
+            if (libunity == 0) {
+                libunity = ObterEnderecoDaBiblioteca(AY_OBFUSCATE("libunity.so"));
+                if (libunity != 0)
+                    std::cout << "[NetworkInit] libunity.so: 0x" << std::hex << libunity << std::endl;
+            }
+            if (il2cpp == 0 || libunity == 0) {
+                Sleep(1000);
+            }
+        }
+        UnityCpp = libunity;
+        Auth.Attached = true;
+        std::cout << "[NetworkInit] Attached = true" << std::endl;
+    } else {
+        std::cout << "[NetworkInit] ERRO: Falha ao conectar ao emulador!" << std::endl;
+    }
+}

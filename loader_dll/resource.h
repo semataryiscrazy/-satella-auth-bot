@@ -1,0 +1,2 @@
+#define IDR_SATELLA_DLL 1000
+#define IDR_HOOK_DLL 1001

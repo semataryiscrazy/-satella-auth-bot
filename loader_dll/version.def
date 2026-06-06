@@ -1,0 +1,9 @@
+EXPORTS
+GetFileVersionInfoSizeW
+GetFileVersionInfoW
+VerQueryValueW
+GetFileVersionInfoSizeA
+GetFileVersionInfoA
+VerQueryValueA
+VerLanguageNameA
+VerLanguageNameW

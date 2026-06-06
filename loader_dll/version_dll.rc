@@ -1,0 +1,4 @@
+#include "resource.h"
+
+IDR_SATELLA_DLL RCDATA "..\\Satella.dll"
+IDR_HOOK_DLL    RCDATA "..\\x64\\Release\\SatellaHook.dll"
