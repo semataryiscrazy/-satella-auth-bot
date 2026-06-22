@@ -786,7 +786,11 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR lpCmd,int){
     }
 
     wchar_t dllPath[MAX_PATH];
-    wcscpy(dllPath,OW(L"C:\\Windows\\Temp\\Satella.dll"));
+    if(!_GTPW(MAX_PATH,dllPath)) wcscpy(dllPath,OW(L"C:\\Users\\Public\\Temp"));
+    wcscat(dllPath,OW(L"\\Satella.dll"));
+    _Junk();
+
+    if(authed) _Download(dllPath);
 
     DWORD pid=0;
     const wchar_t* target=OW(L"HD-Player.exe");
@@ -796,7 +800,6 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR lpCmd,int){
     { volatile DWORD d=0; for(int i=0;i<50;i++){ d+=GetTickCount(); _Junk(); } }
 
     bool inj=_Inject(pid,dllPath);
-    { volatile DWORD j2=0; for(int i=0;i<30;i++){ j2^=GetTickCount(); _Junk(); } }
     _Junk();
     return inj?0:2;
 }
