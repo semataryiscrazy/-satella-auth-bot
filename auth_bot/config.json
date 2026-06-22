@@ -1,0 +1,13 @@
+{
+    "token": "DISCORD_TOKEN_AQUI",
+    "admin_ids": [1512518620373324047],
+    "api_port": 5000,
+    "admins": {
+        "s": "2200922",
+        "mutano": "902209"
+    },
+    "webhook_url": "WEBHOOK_URL_AQUI",
+    "pix_key": "31985981132",
+    "pix_value": "25.00",
+    "pix_name": "SATUELLER L S"
+}
