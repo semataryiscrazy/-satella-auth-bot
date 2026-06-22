@@ -53,6 +53,8 @@ CONFIG.setdefault("pix_key", "")
 CONFIG.setdefault("pix_value", "25.00")
 CONFIG.setdefault("ticket_category_id", 0)
 CONFIG.setdefault("sales_channel_id", 0)
+CONFIG.setdefault("welcome_channel_id", 0)
+CONFIG.setdefault("welcome_role_id", 0)
 
 if os.environ.get("PIX_KEY"):
     CONFIG["pix_key"] = os.environ["PIX_KEY"]
@@ -60,6 +62,10 @@ if os.environ.get("TICKET_CATEGORY_ID"):
     CONFIG["ticket_category_id"] = int(os.environ["TICKET_CATEGORY_ID"])
 if os.environ.get("GUILD_ID"):
     CONFIG["guild_id"] = int(os.environ["GUILD_ID"])
+if os.environ.get("WELCOME_CHANNEL_ID"):
+    CONFIG["welcome_channel_id"] = int(os.environ["WELCOME_CHANNEL_ID"])
+if os.environ.get("WELCOME_ROLE_ID"):
+    CONFIG["welcome_role_id"] = int(os.environ["WELCOME_ROLE_ID"])
 
 def gerar_pix_brcode(chave: str, valor: float, nome: str, cidade: str = "Sao Paulo", txid: str = "***") -> str:
     def crc16(s: str) -> str:
@@ -226,7 +232,7 @@ def make_token():
 tokens = {}
 intents = discord.Intents.default()
 intents.message_content = False
-intents.members = False
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def is_admin(interaction: discord.Interaction):
@@ -316,6 +322,34 @@ async def on_ready():
             print(f"[BOT] {len(synced)} comandos sincronizados globalmente")
     except Exception as e:
         print(f"[BOT] Erro sync: {e}")
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    guild = member.guild
+    role_id = CONFIG.get("welcome_role_id", 0)
+    if role_id:
+        role = guild.get_role(role_id)
+        if role:
+            try:
+                await member.add_roles(role)
+                print(f"[BOT] Cargo {role.name} atribuido a {member.name}")
+            except Exception as e:
+                print(f"[BOT] Erro ao atribuir cargo: {e}")
+    channel_id = CONFIG.get("welcome_channel_id", 0)
+    if channel_id:
+        channel = guild.get_channel(channel_id)
+        if channel:
+            embed = discord.Embed(
+                title="\U0001f44b Bem-vindo!",
+                color=0xDB00A6,
+                description=f"**{member.mention} entrou no servidor!**\n\nBem-vindo(a) ao **Satella Private**!\nUse `/ticket` para adquirir sua licenca.",
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text="Satella Private")
+            try:
+                await channel.send(embed=embed)
+            except Exception as e:
+                print(f"[BOT] Erro ao enviar welcome: {e}")
 
 admin_group = AdminGroup(name="admin", description="Comandos administrativos")
 
