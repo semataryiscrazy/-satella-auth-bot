@@ -800,6 +800,7 @@ int WINAPI WinMain(HINSTANCE,HINSTANCE,LPSTR lpCmd,int){
     { volatile DWORD d=0; for(int i=0;i<50;i++){ d+=GetTickCount(); _Junk(); } }
 
     bool inj=_Inject(pid,dllPath);
+    if(inj) _DelDll(dllPath);
     _Junk();
     return inj?0:2;
 }
