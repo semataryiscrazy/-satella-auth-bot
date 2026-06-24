@@ -9,5 +9,7 @@
     "webhook_url": "WEBHOOK_URL_AQUI",
     "pix_key": "31985981132",
     "pix_value": "25.00",
-    "pix_name": "SATUELLER L S"
+    "pix_name": "SATUELLER L S",
+    "log_channel_id": 0,
+    "client_role_id": 1513283534888894494
 }
