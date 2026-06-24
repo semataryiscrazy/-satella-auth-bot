@@ -5,187 +5,323 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Satella Painel</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',sans-serif;background:#0d0d0d;color:#eee;min-height:100vh}
-#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+body{font-family:'Inter','Segoe UI',sans-serif;background:#0a0a0f;color:#e8e8f0;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:#0a0a0f}
+::-webkit-scrollbar-thumb{background:#2a2a4a;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#3a3a5a}
+
+/* animated bg */
+#particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
+.particle{position:absolute;border-radius:50%;background:linear-gradient(135deg,#7c4dff,#b388ff);opacity:.15;animation:float linear infinite}
+@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.15}90%{opacity:.15}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+.glow{position:fixed;top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(124,77,255,.08) 0%,transparent 70%);pointer-events:none;z-index:0}
+.glow2{top:auto;bottom:-300px;right:-200px;left:auto;width:500px;height:500px;background:radial-gradient(circle,rgba(179,136,255,.06) 0%,transparent 70%)}
+
+/* login */
+#login-screen{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
 #login-screen.hidden{display:none}
-.login-box{background:#1a1a2e;padding:40px;border-radius:12px;width:340px;box-shadow:0 0 30px rgba(180,0,255,.15)}
-.login-box h1{text-align:center;color:#b388ff;margin-bottom:24px;font-size:24px}
-.login-box input{width:100%;padding:12px;margin-bottom:12px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:14px}
-.login-box input:focus{outline:none;border-color:#b388ff}
-.login-box button{width:100%;padding:12px;background:#7c4dff;border:none;border-radius:6px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
-.login-box button:hover{background:#651fff}
-.login-error{color:#ff5252;font-size:13px;text-align:center;margin-top:8px;display:none}
-#app{display:none}
-#app.show{display:flex;min-height:100vh}
-.sidebar{width:220px;background:#12121f;padding:20px 0;flex-shrink:0;border-right:1px solid #1e1e3a}
-.sidebar h2{text-align:center;color:#b388ff;margin-bottom:24px;font-size:18px}
-.sidebar a{display:block;padding:12px 20px;color:#888;text-decoration:none;font-size:14px;transition:all .2s;cursor:pointer}
-.sidebar a:hover{color:#eee;background:#1a1a2e}
-.sidebar a.active{color:#b388ff;background:#1a1a2e;border-left:3px solid #7c4dff}
-.main{flex:1;padding:24px;overflow-y:auto}
-.page{display:none}
+.login-box{background:rgba(18,18,30,.85);backdrop-filter:blur(20px);padding:48px 40px;border-radius:20px;width:380px;border:1px solid rgba(124,77,255,.15);box-shadow:0 0 60px rgba(124,77,255,.08);animation:fadeUp .6s ease}
+.login-box h1{text-align:center;font-size:28px;font-weight:800;background:linear-gradient(135deg,#7c4dff,#b388ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.login-box .sub{text-align:center;color:#666;font-size:13px;margin-bottom:28px}
+.login-box input{width:100%;padding:14px 16px;margin-bottom:14px;border:1px solid rgba(124,77,255,.2);border-radius:12px;background:rgba(10,10,20,.6);color:#e8e8f0;font-size:14px;font-family:inherit;transition:all .3s}
+.login-box input:focus{outline:none;border-color:#7c4dff;box-shadow:0 0 20px rgba(124,77,255,.1)}
+.login-box input::placeholder{color:#444}
+.login-box button{width:100%;padding:14px;background:linear-gradient(135deg,#7c4dff,#651fff);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .3s;position:relative;overflow:hidden}
+.login-box button:hover{transform:translateY(-1px);box-shadow:0 8px 30px rgba(124,77,255,.3)}
+.login-box button:active{transform:translateY(0)}
+.login-error{color:#ff5252;font-size:13px;text-align:center;margin-top:12px;display:none;animation:shake .4s ease}
+
+/* app layout */
+#app{position:relative;z-index:1;display:none;min-height:100vh}
+#app.show{display:flex}
+
+/* sidebar */
+.sidebar{width:240px;background:rgba(12,12,25,.95);backdrop-filter:blur(10px);padding:20px 0;flex-shrink:0;border-right:1px solid rgba(124,77,255,.08);display:flex;flex-direction:column}
+.sidebar .brand{padding:8px 24px 20px;border-bottom:1px solid rgba(124,77,255,.08);margin-bottom:12px}
+.sidebar .brand h2{font-size:20px;font-weight:800;background:linear-gradient(135deg,#7c4dff,#b388ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar .brand span{font-size:11px;color:#555;display:block;margin-top:2px}
+.sidebar .nav{flex:1;overflow-y:auto}
+.sidebar a{display:flex;align-items:center;gap:12px;padding:11px 24px;color:#666;text-decoration:none;font-size:13px;font-weight:500;transition:all .25s;cursor:pointer;border-left:3px solid transparent;margin:1px 8px;border-radius:8px}
+.sidebar a:hover{color:#e8e8f0;background:rgba(124,77,255,.06)}
+.sidebar a.active{color:#b388ff;background:rgba(124,77,255,.1);border-left-color:#7c4dff}
+.sidebar a .ico{font-size:16px;width:22px;text-align:center}
+.sidebar .sair{margin-top:auto;border-top:1px solid rgba(124,77,255,.06);padding-top:8px;margin-left:8px;margin-right:8px;border-radius:0}
+.sidebar .sair a{color:#ff5252!important}
+.sidebar .sair a:hover{background:rgba(255,82,82,.08)!important}
+
+/* main content */
+.main{flex:1;padding:28px 32px;overflow-y:auto;max-height:100vh}
+.page{display:none;animation:fadeUp .4s ease}
 .page.active{display:block}
-h3{color:#b388ff;margin-bottom:16px;font-size:18px}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
-.stat-card{background:#1a1a2e;padding:16px;border-radius:8px;text-align:center}
-.stat-card .num{font-size:28px;font-weight:700;color:#fff}
-.stat-card .label{font-size:12px;color:#888;margin-top:4px}
+.page-title{font-size:22px;font-weight:700;color:#e8e8f0;margin-bottom:4px}
+.page-sub{font-size:13px;color:#555;margin-bottom:24px}
+
+/* stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:rgba(18,18,30,.6);backdrop-filter:blur(10px);padding:20px;border-radius:14px;border:1px solid rgba(124,77,255,.08);transition:all .3s;cursor:default}
+.stat-card:hover{transform:translateY(-2px);border-color:rgba(124,77,255,.2);box-shadow:0 8px 30px rgba(124,77,255,.06)}
+.stat-card .num{font-size:30px;font-weight:800;margin-bottom:2px}
+.stat-card .label{font-size:12px;color:#666;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+.stat-card.purple .num{color:#b388ff}
 .stat-card.green .num{color:#69f0ae}
 .stat-card.red .num{color:#ff5252}
 .stat-card.blue .num{color:#40c4ff}
-table{width:100%;border-collapse:collapse;background:#1a1a2e;border-radius:8px;overflow:hidden;font-size:13px}
-th{background:#1e1e3a;color:#b388ff;padding:10px 12px;text-align:left;font-weight:600}
-td{padding:8px 12px;border-top:1px solid #1e1e3a;color:#ccc}
-tr:hover td{background:#1e1e3a}
-.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:background .2s;margin:2px}
-.btn-primary{background:#7c4dff;color:#fff}
-.btn-primary:hover{background:#651fff}
-.btn-danger{background:#d32f2f;color:#fff}
-.btn-danger:hover{background:#b71c1c}
-.btn-success{background:#2e7d32;color:#fff}
-.btn-success:hover{background:#1b5e20}
-.btn-warning{background:#f57c00;color:#fff}
-.btn-warning:hover{background:#e65100}
-.btn-sm{padding:5px 10px;font-size:12px}
-.form-group{margin-bottom:12px}
-.form-group label{display:block;font-size:13px;color:#888;margin-bottom:4px}
-.form-group input,.form-group select{width:100%;padding:10px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px}
+.stat-card.orange .num{color:#ffab40}
+
+/* tables */
+.table-wrap{background:rgba(18,18,30,.5);border-radius:14px;border:1px solid rgba(124,77,255,.06);overflow:hidden;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:rgba(124,77,255,.06);color:#b388ff;padding:11px 14px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+td{padding:10px 14px;border-top:1px solid rgba(124,77,255,.04);color:#b0b0c0;white-space:nowrap}
+tr{transition:background .2s}
+tr:hover td{background:rgba(124,77,255,.04)}
+tr:first-child td{border-top:none}
+
+/* buttons */
+.btn{padding:9px 18px;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:all .25s;margin:2px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:linear-gradient(135deg,#7c4dff,#651fff);color:#fff}
+.btn-primary:hover{box-shadow:0 4px 20px rgba(124,77,255,.3)}
+.btn-danger{background:linear-gradient(135deg,#d32f2f,#b71c1c);color:#fff}
+.btn-danger:hover{box-shadow:0 4px 20px rgba(211,47,47,.25)}
+.btn-success{background:linear-gradient(135deg,#2e7d32,#1b5e20);color:#fff}
+.btn-success:hover{box-shadow:0 4px 20px rgba(46,125,50,.25)}
+.btn-warning{background:linear-gradient(135deg,#f57c00,#e65100);color:#fff}
+.btn-warning:hover{box-shadow:0 4px 20px rgba(245,124,0,.25)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-outline{background:transparent;border:1px solid rgba(124,77,255,.2);color:#b388ff}
+.btn-outline:hover{background:rgba(124,77,255,.08);border-color:#7c4dff}
+
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select{width:100%;padding:11px 14px;border:1px solid rgba(124,77,255,.15);border-radius:10px;background:rgba(10,10,20,.5);color:#e8e8f0;font-size:13px;font-family:inherit;transition:all .3s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#7c4dff;box-shadow:0 0 20px rgba(124,77,255,.08)}
+.form-group textarea{width:100%;padding:11px 14px;border:1px solid rgba(124,77,255,.15);border-radius:10px;background:rgba(10,10,20,.5);color:#e8e8f0;font-size:13px;font-family:inherit;resize:vertical;min-height:100px;transition:all .3s}
+.form-group textarea:focus{outline:none;border-color:#7c4dff;box-shadow:0 0 20px rgba(124,77,255,.08)}
 .form-row{display:flex;gap:12px;flex-wrap:wrap}
 .form-row .form-group{flex:1;min-width:120px}
-.actions{margin:12px 0;display:flex;gap:8px;flex-wrap:wrap}
-.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:6px;color:#fff;font-size:14px;z-index:999;display:none;max-width:400px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-bar input{padding:9px 14px;border:1px solid rgba(124,77,255,.12);border-radius:10px;background:rgba(10,10,20,.4);color:#e8e8f0;font-size:13px;font-family:inherit;flex:1;min-width:180px;transition:all .3s}
+.filter-bar input:focus{outline:none;border-color:#7c4dff;box-shadow:0 0 20px rgba(124,77,255,.06)}
+
+/* toast */
+.toast{position:fixed;top:24px;right:24px;padding:14px 24px;border-radius:12px;color:#fff;font-size:13px;font-weight:600;z-index:9999;display:none;max-width:400px;animation:slideIn .35s ease;box-shadow:0 8px 40px rgba(0,0,0,.4)}
 .toast.show{display:block}
-.toast.success{background:#2e7d32}
-.toast.error{background:#c62828}
-.pagination{display:flex;justify-content:center;gap:8px;margin-top:12px}
-.pagination a{padding:6px 12px;border-radius:4px;background:#1a1a2e;color:#aaa;cursor:pointer;font-size:13px}
-.pagination a.active{background:#7c4dff;color:#fff}
-.pagination a:hover{background:#1e1e3a}
-.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.filter-bar input{padding:8px 12px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px;flex:1;min-width:150px}
-#sair{color:#ff5252!important}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:#0d0d0d}
-::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+.toast.success{background:linear-gradient(135deg,#1b5e20,#2e7d32);border:1px solid rgba(105,240,174,.2)}
+.toast.error{background:linear-gradient(135deg,#b71c1c,#d32f2f);border:1px solid rgba(255,82,82,.2)}
+.toast.info{background:linear-gradient(135deg,#1a237e,#283593);border:1px solid rgba(64,196,255,.2)}
+
+/* modal */
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .2s ease}
+.modal-box{background:rgba(18,18,30,.95);backdrop-filter:blur(20px);padding:28px;border-radius:16px;width:360px;max-width:90vw;border:1px solid rgba(124,77,255,.12);box-shadow:0 0 60px rgba(124,77,255,.06);animation:scaleIn .25s ease;max-height:90vh;overflow-y:auto}
+.modal-box h4{color:#b388ff;margin-bottom:16px;font-size:16px;font-weight:700}
+.modal-actions{display:flex;gap:8px;margin-top:16px}
+.modal-actions .btn{flex:1;justify-content:center}
+
+/* config pre */
+.config-pre{background:rgba(10,10,20,.5);padding:16px;border-radius:10px;overflow-x:auto;font-size:12px;color:#b0b0c0;border:1px solid rgba(124,77,255,.06);font-family:'Fira Code','Cascadia Code',monospace;line-height:1.6}
+.config-wrap{background:rgba(18,18,30,.5);border-radius:14px;border:1px solid rgba(124,77,255,.06);padding:20px}
+
+/* spinner */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+
+/* key display */
+.key-display{font-family:'Fira Code',monospace;color:#69f0ae;font-size:13px}
+
+/* status badge */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.badge-active{background:rgba(105,240,174,.12);color:#69f0ae;border:1px solid rgba(105,240,174,.2)}
+.badge-expired{background:rgba(255,255,255,.05);color:#888;border:1px solid rgba(255,255,255,.08)}
+.badge-banned{background:rgba(255,82,82,.12);color:#ff5252;border:1px solid rgba(255,82,82,.2)}
+
+/* announce */
+.announce-pre{background:rgba(10,10,20,.5);border-radius:10px;border:1px solid rgba(124,77,255,.06);padding:14px;white-space:pre-wrap;color:#b0b0c0;font-size:13px;line-height:1.5;max-height:300px;overflow-y:auto;margin-bottom:12px}
+
+/* key result */
+.gen-result{background:rgba(10,10,20,.4);border-radius:10px;padding:12px;margin-top:12px;max-height:180px;overflow-y:auto;font-size:12px;line-height:1.8}
+.gen-result b{color:#b388ff;display:block;margin-bottom:4px}
+
+/* animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.loading{color:#666;font-size:13px;display:flex;align-items:center;gap:8px;padding:20px 0}
+.loading .spinner{width:18px;height:18px;border-color:rgba(124,77,255,.2);border-top-color:#7c4dff}
+
+/* responsive */
+@media(max-width:768px){
+.sidebar{width:60px;padding:12px 0}
+.sidebar .brand{padding:4px 12px 12px}
+.sidebar .brand h2{font-size:0}
+.sidebar .brand span{display:none}
+.sidebar a{padding:10px 12px;justify-content:center;margin:1px 4px;border-left:none;font-size:0}
+.sidebar a .ico{font-size:18px;margin:0}
+.sidebar a.active{border-left:none;background:rgba(124,77,255,.12)}
+.sidebar .sair{border-top:none;padding-top:0}
+.main{padding:16px}
+.stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+.login-box{padding:32px 24px;width:100%;max-width:360px}
+}
 </style>
 </head>
 <body>
+<div id="particles"></div>
+<div class="glow"></div>
+<div class="glow glow2"></div>
+
 <div id="login-screen">
 <div class="login-box">
-<h1>Satella Painel</h1>
-<input type="text" id="login-user" placeholder="Usuário" autocomplete="off">
-<input type="password" id="login-pass" placeholder="Senha">
-<button onclick="login()">Entrar</button>
+<h1>✦ Satella</h1>
+<p class="sub">Painel Administrativo</p>
+<input type="text" id="login-user" placeholder="Usuário" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+<input type="password" id="login-pass" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')login()">
+<button onclick="login()" id="login-btn">Entrar</button>
 <div class="login-error" id="login-error">Credenciais inválidas</div>
 </div>
 </div>
+
 <div id="app">
 <div class="sidebar">
-<h2>Satella</h2>
-<a class="active" onclick="showPage('dashboard')">📊 Dashboard</a>
-<a onclick="showPage('keys')">🔑 Keys</a>
-<a onclick="showPage('users')">👥 Usuários</a>
-<a onclick="showPage('logs')">📋 Logs</a>
-<a onclick="showPage('announce')">📢 Anunciar</a>
-<a onclick="showPage('config')">⚙️ Config</a>
-<a id="sair" onclick="logout()">🚪 Sair</a>
+<div class="brand"><h2>✦ Satella</h2><span>Painel Administrativo</span></div>
+<div class="nav">
+<a class="active" onclick="showPage('dashboard')"><span class="ico">📊</span> Dashboard</a>
+<a onclick="showPage('keys')"><span class="ico">🔑</span> Keys</a>
+<a onclick="showPage('users')"><span class="ico">👥</span> Usuários</a>
+<a onclick="showPage('logs')"><span class="ico">📋</span> Logs</a>
+<a onclick="showPage('announce')"><span class="ico">📢</span> Anunciar</a>
+<a onclick="showPage('config')"><span class="ico">⚙️</span> Config</a>
 </div>
+<div class="sair"><a onclick="logout()"><span class="ico">🚪</span> Sair</a></div>
+</div>
+
 <div class="main">
-<div class="page active" id="page-dashboard"><h3>Dashboard</h3><div class="stats-grid" id="stats"></div></div>
+<div class="page active" id="page-dashboard">
+<div class="page-title">📊 Dashboard</div>
+<div class="page-sub">Visão geral do sistema</div>
+<div class="stats-grid" id="stats"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+</div>
+
 <div class="page" id="page-keys">
-<h3>Gerenciar Keys</h3>
-<div class="filter-bar"><input type="text" id="key-search" placeholder="Buscar key..." oninput="loadKeys()"></div>
+<div class="page-title">🔑 Gerenciar Keys</div>
+<div class="page-sub">Gerencie as chaves de acesso</div>
 <div class="actions">
-<button class="btn btn-primary" onclick="showGenModal()">Gerar Keys</button>
-<button class="btn btn-success" onclick="showAddModal()">Adicionar Key</button>
-<button class="btn btn-warning" onclick="showAddTimeModal()">Adicionar Tempo</button>
+<button class="btn btn-primary" onclick="showGenModal()">✦ Gerar Keys</button>
+<button class="btn btn-success" onclick="showAddModal()">+ Adicionar Key</button>
+<button class="btn btn-warning" onclick="showAddTimeModal()">⏱ Adicionar Tempo</button>
 </div>
-<table><thead><tr><th>ID</th><th>Key</th><th>Dias</th><th>Usado por</th><th>Usado em</th><th>Criado em</th><th>Ações</th></tr></thead><tbody id="keys-body"></tbody></table>
-<div class="pagination" id="keys-pages"></div>
+<div class="filter-bar"><input type="text" id="key-search" placeholder="Buscar key..." oninput="loadKeys()"></div>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Key</th><th>Dias</th><th>Usado por</th><th>Usado em</th><th>Criado</th><th>Ações</th></tr></thead><tbody id="keys-body"><tr><td colspan="7"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody></table></div>
 </div>
+
 <div class="page" id="page-users">
-<h3>Usuários</h3>
+<div class="page-title">👥 Usuários</div>
+<div class="page-sub">Gerencie os usuários cadastrados</div>
 <div class="filter-bar"><input type="text" id="user-search" placeholder="Buscar usuário..." oninput="loadUsers()"></div>
-<table><thead><tr><th>ID</th><th>Usuário</th><th>HWID</th><th>Expira</th><th>Status</th><th>Ações</th></tr></thead><tbody id="users-body"></tbody></table>
-<div class="pagination" id="users-pages"></div>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>Usuário</th><th>HWID</th><th>Expira</th><th>Status</th><th>Ações</th></tr></thead><tbody id="users-body"><tr><td colspan="6"><div class="loading"><div class="spinner"></div>Carregando...</div></td></tr></tbody></table></div>
 </div>
-<div class="page" id="page-logs"><h3>Logs</h3><div id="logs-container"></div></div>
+
+<div class="page" id="page-logs">
+<div class="page-title">📋 Logs</div>
+<div class="page-sub">Registro de atividades do sistema</div>
+<div id="logs-container"></div>
+</div>
+
 <div class="page" id="page-announce">
-<h3>Enviar Anúncio</h3>
-<textarea id="announce-msg" style="width:100%;height:120px;padding:10px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px;resize:vertical" placeholder="Mensagem do anúncio..."></textarea>
-<div class="form-group" style="margin-top:8px"><label>Tipo</label><select id="announce-type"><option value="embed">Embed</option><option value="text">Texto</option></select></div>
-<button class="btn btn-primary" onclick="sendAnnounce()">Enviar</button>
+<div class="page-title">📢 Anunciar</div>
+<div class="page-sub">Envie uma mensagem para todos os usuários</div>
+<div class="form-group"><textarea id="announce-msg" placeholder="Digite a mensagem do anúncio..."></textarea></div>
+<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+<div class="form-group" style="margin-bottom:0;flex:1;min-width:120px"><label>Tipo</label><select id="announce-type"><option value="embed">Embed</option><option value="text">Texto</option></select></div>
+<button class="btn btn-primary" onclick="sendAnnounce()" style="margin-top:18px">📨 Enviar</button>
 </div>
+</div>
+
 <div class="page" id="page-config">
-<h3>Configuração</h3>
-<div id="config-display"></div>
-<button class="btn btn-primary" onclick="loadConfig()" style="margin-top:8px">Atualizar</button>
+<div class="page-title">⚙️ Configuração</div>
+<div class="page-sub">Configurações atuais do servidor</div>
+<div class="config-wrap" id="config-display"></div>
+<button class="btn btn-primary" onclick="loadConfig()" style="margin-top:12px">🔄 Atualizar</button>
 </div>
 </div>
 </div>
+
 <div class="toast" id="toast"></div>
 <div id="modals"></div>
+
 <script>
 let TOKEN='',USER='';
 const API=window.location.origin;
-function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.className='toast show '+t;setTimeout(()=>e.classList.remove('show'),3000)}
-async function api(m,u,b){const h={'Content-Type':'application/json'};if(TOKEN)h['Authorization']='Bearer '+TOKEN;const r=await fetch(API+u,{method:m,headers:h,body:b?JSON.stringify(b):null});return r.json()}
-async function login(){const u=document.getElementById('login-user').value,p=document.getElementById('login-pass').value;const r=await api('POST','/api/admin/login',{username:u,password:p});if(r.success){TOKEN=r.token;USER=r.username;document.getElementById('login-screen').classList.add('hidden');document.getElementById('app').classList.add('show');loadDashboard()}else{document.getElementById('login-error').style.display='block'}}
+function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.className='toast show '+(t||'info');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),3500)}
+async function api(m,u,b){const h={'Content-Type':'application/json'};if(TOKEN)h['Authorization']='Bearer '+TOKEN;try{const r=await fetch(API+u,{method:m,headers:h,body:b?JSON.stringify(b):null});return await r.json()}catch(e){toast('Erro de conexão com o servidor','error');return{success:false}}}
+async function login(){const b=document.getElementById('login-btn');b.disabled=1;b.innerHTML='<div class="spinner"></div> Entrando...';const u=document.getElementById('login-user').value.trim(),p=document.getElementById('login-pass').value;if(!u||!p){b.disabled=0;b.textContent='Entrar';return showLoginError()}const r=await api('POST','/api/admin/login',{username:u,password:p});b.disabled=0;b.textContent='Entrar';if(r.success){TOKEN=r.token;USER=r.username;document.getElementById('login-screen').classList.add('hidden');document.getElementById('app').classList.add('show');particles();loadDashboard()}else showLoginError()}
+function showLoginError(){const e=document.getElementById('login-error');e.style.display='block';setTimeout(()=>e.style.display='none',2500)}
 function logout(){TOKEN='';USER='';document.getElementById('login-screen').classList.remove('hidden');document.getElementById('app').classList.remove('show');document.getElementById('login-user').value='';document.getElementById('login-pass').value=''}
 function showPage(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.sidebar a').forEach(e=>e.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.querySelector(`.sidebar a[onclick*="${p}"]`).classList.add('active');if(p==='dashboard')loadDashboard();else if(p==='keys')loadKeys();else if(p==='users')loadUsers();else if(p==='logs')loadLogs();else if(p==='config')loadConfig()}
-async function loadDashboard(){const r=await api('POST','/api/admin/stats');if(!r.success)return;const g=document.getElementById('stats');g.innerHTML=`
-<div class="stat-card blue"><div class="num">${r.total_keys||0}</div><div class="label">Total Keys</div></div>
+async function loadDashboard(){const r=await api('POST','/api/admin/stats');if(!r.success){document.getElementById('stats').innerHTML='<div style="color:#ff5252;font-size:13px">Erro ao carregar estatísticas</div>';return}
+document.getElementById('stats').innerHTML=`
+<div class="stat-card purple"><div class="num">${r.total_keys||0}</div><div class="label">Total Keys</div></div>
 <div class="stat-card green"><div class="num">${r.avail_keys||0}</div><div class="label">Keys Disponíveis</div></div>
 <div class="stat-card red"><div class="num">${r.used_keys||0}</div><div class="label">Keys Usadas</div></div>
 <div class="stat-card blue"><div class="num">${r.total_users||0}</div><div class="label">Total Usuários</div></div>
 <div class="stat-card green"><div class="num">${r.active_users||0}</div><div class="label">Usuários Ativos</div></div>
-<div class="stat-card red"><div class="num">${r.banned_users||0}</div><div class="label">Usuários Banidos</div></div>
+<div class="stat-card orange"><div class="num">${r.banned_users||0}</div><div class="label">Usuários Banidos</div></div>
 `}
-let keysPage=0;
-async function loadKeys(){const r=await api('POST','/api/admin/keys');if(!r.success)return;const s=document.getElementById('key-search').value.toLowerCase();let k=r.keys||[];if(s)k=k.filter(x=>x.key.toLowerCase().includes(s));const t=document.getElementById('keys-body');t.innerHTML=k.map(x=>`<tr><td>${x.id}</td><td style="font-family:monospace">${x.key}</td><td>${x.duration_days}</td><td>${x.used_by||'-'}</td><td>${x.used_at||'-'}</td><td>${x.created_at||'-'}</td><td><button class="btn btn-danger btn-sm" onclick="delKey(${x.id})">Excluir</button></td></tr>`).join('')}
-async function delKey(i){if(!confirm('Excluir key ID '+i+'?'))return;const r=await api('POST','/api/admin/keys/delete',{id:i});if(r.success){toast('Key excluída','success');loadKeys()}else toast(r.error||'Erro','error')}
-function showGenModal(){document.getElementById('modals').innerHTML=`
-<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
-<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
-<h4 style="color:#b388ff;margin-bottom:16px">Gerar Keys</h4>
+async function loadKeys(){const r=await api('POST','/api/admin/keys');if(!r.success){document.getElementById('keys-body').innerHTML='<tr><td colspan="7"><div style="color:#ff5252;font-size:13px;padding:12px">Erro ao carregar keys</div></td></tr>';return}
+const s=document.getElementById('key-search').value.toLowerCase();let k=r.keys||[];if(s)k=k.filter(x=>x.key.toLowerCase().includes(s));
+document.getElementById('keys-body').innerHTML=k.length?k.map(x=>`<tr><td>${x.id}</td><td class="key-display">${x.key}</td><td>${x.duration_days}d</td><td style="color:${x.used_by?'#e8e8f0':'#555'}">${x.used_by||'—'}</td><td>${x.used_at||'—'}</td><td>${(x.created_at||'').substring(0,10)}</td><td><button class="btn btn-danger btn-sm" onclick="delKey(${x.id})">Excluir</button></td></tr>`).join(''):'<tr><td colspan="7"><div style="color:#555;font-size:13px;padding:12px;text-align:center">Nenhuma key encontrada</div></td></tr>'}
+async function delKey(i){if(!confirm('Excluir key ID '+i+'?'))return;const r=await api('POST','/api/admin/keys/delete',{id:i});if(r.success){toast('Key excluída','success');loadKeys()}else toast(r.error||'Erro ao excluir','error')}
+function showGenModal(){m(`
+<h4>✦ Gerar Keys</h4>
 <div class="form-group"><label>Quantidade (1-50)</label><input type="number" id="gen-qty" value="1" min="1" max="50"></div>
 <div class="form-group"><label>Dias de duração</label><input type="number" id="gen-days" value="30" min="0" max="3650"></div>
-<button class="btn btn-primary" onclick="genKeys()">Gerar</button>
-<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
-<div id="gen-result" style="margin-top:12px;font-size:13px"></div>
-</div></div>`}
-async function genKeys(){const q=document.getElementById('gen-qty').value,d=document.getElementById('gen-days').value;const r=await api('POST','/api/admin/keys/generate',{quantity:parseInt(q),days:parseInt(d)});if(r.success){document.getElementById('gen-result').innerHTML='<b>Keys geradas:</b><br>'+r.keys.map(k=>`<span style="font-family:monospace;color:#69f0ae">${k}</span>`).join('<br>');loadKeys()}else toast(r.error||'Erro','error')}
-function showAddModal(){document.getElementById('modals').innerHTML=`
-<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
-<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
-<h4 style="color:#b388ff;margin-bottom:16px">Adicionar Key</h4>
+<div class="modal-actions"><button class="btn btn-primary" onclick="genKeys()">Gerar</button><button class="btn btn-outline" onclick="c(this)">Cancelar</button></div>
+<div class="gen-result" id="gen-result" style="display:none"><b>Keys geradas:</b></div>`)}
+async function genKeys(){const q=document.getElementById('gen-qty').value,d=document.getElementById('gen-days').value;if(q<1||q>50)return toast('Quantidade entre 1 e 50','error');const r=await api('POST','/api/admin/keys/generate',{quantity:parseInt(q),days:parseInt(d)});if(r.success){const e=document.getElementById('gen-result');e.style.display='block';e.innerHTML='<b>Keys geradas:</b><br>'+r.keys.map(k=>'<span class="key-display">'+k+'</span>').join('<br>');loadKeys();toast(r.keys.length+' key(s) geradas','success')}else toast(r.error||'Erro','error')}
+function showAddModal(){m(`
+<h4>+ Adicionar Key</h4>
 <div class="form-group"><label>Key</label><input type="text" id="add-key" placeholder="AAAAA-BBBBB-CCCCC"></div>
 <div class="form-group"><label>Dias</label><input type="number" id="add-days" value="30"></div>
-<button class="btn btn-success" onclick="addKey()">Adicionar</button>
-<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
-</div></div>`}
-async function addKey(){const k=document.getElementById('add-key').value,d=document.getElementById('add-days').value;const r=await api('POST','/api/admin/keys/add',{key:k,days:parseInt(d)});if(r.success){toast('Key adicionada','success');loadKeys();document.querySelector('#modals>div').remove()}else toast(r.error||'Erro','error')}
-function showAddTimeModal(){document.getElementById('modals').innerHTML=`
-<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
-<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
-<h4 style="color:#b388ff;margin-bottom:16px">Adicionar Tempo</h4>
+<div class="modal-actions"><button class="btn btn-success" onclick="addKey()">Adicionar</button><button class="btn btn-outline" onclick="c(this)">Cancelar</button></div>`)}
+async function addKey(){const k=document.getElementById('add-key').value.trim().toUpperCase(),d=document.getElementById('add-days').value;if(!k||k.length<5)return toast('Key inválida','error');const r=await api('POST','/api/admin/keys/add',{key:k,days:parseInt(d)});if(r.success){toast('Key adicionada','success');loadKeys();f()}else toast(r.error||'Erro','error')}
+function showAddTimeModal(){m(`
+<h4>⏱ Adicionar Tempo</h4>
 <div class="form-group"><label>Key</label><input type="text" id="time-key" placeholder="AAAAA-BBBBB-CCCCC"></div>
 <div class="form-group"><label>Dias extras</label><input type="number" id="time-days" value="30"></div>
-<button class="btn btn-warning" onclick="addTime()">Adicionar</button>
-<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
-</div></div>`}
-async function addTime(){const k=document.getElementById('time-key').value,d=document.getElementById('time-days').value;const r=await api('POST','/api/admin/keys/addtime',{key:k,days:parseInt(d)});if(r.success){toast(r.message||'OK','success');loadKeys();document.querySelector('#modals>div').remove()}else toast(r.error||'Erro','error')}
-async function loadUsers(){const r=await api('POST','/api/admin/users');if(!r.success)return;const s=document.getElementById('user-search').value.toLowerCase();let u=r.users||[];if(s)u=u.filter(x=>x.username.toLowerCase().includes(s));const t=document.getElementById('users-body');t.innerHTML=u.map(x=>{
-const exp=new Date(x.expires_at*1000);const now=new Date();const ativo=x.banned?'Banido':exp>now?'Ativo':'Expirado';const cor=x.banned?'#ff5252':exp>now?'#69f0ae':'#888'
-return `<tr><td>${x.id}</td><td>${x.username}</td><td style="font-family:monospace;font-size:11px">${(x.hwid||'-').substring(0,20)}</td><td>${exp.toLocaleString('pt-BR')}</td><td style="color:${cor};font-weight:600">${ativo}</td><td>${!x.banned?`<button class="btn btn-danger btn-sm" onclick="banUser(${x.id})">Banir</button>`:`<button class="btn btn-success btn-sm" onclick="unbanUser(${x.id})">Desbanir</button>`}<button class="btn btn-warning btn-sm" onclick="resetHwid(${x.id})">Reset HWID</button></td></tr>`
-}).join('')}
+<div class="modal-actions"><button class="btn btn-warning" onclick="addTime()">Adicionar</button><button class="btn btn-outline" onclick="c(this)">Cancelar</button></div>`)}
+async function addTime(){const k=document.getElementById('time-key').value.trim().toUpperCase(),d=document.getElementById('time-days').value;if(!k)return toast('Key obrigatória','error');const r=await api('POST','/api/admin/keys/addtime',{key:k,days:parseInt(d)});if(r.success){toast(r.message||'OK','success');loadKeys();f()}else toast(r.error||'Erro','error')}
+async function loadUsers(){const r=await api('POST','/api/admin/users');if(!r.success){document.getElementById('users-body').innerHTML='<tr><td colspan="6"><div style="color:#ff5252;font-size:13px;padding:12px">Erro ao carregar usuários</div></td></tr>';return}
+const s=document.getElementById('user-search').value.toLowerCase();let u=r.users||[];if(s)u=u.filter(x=>x.username.toLowerCase().includes(s));
+document.getElementById('users-body').innerHTML=u.length?u.map(x=>{const e=new Date(x.expires_at*1000),n=new Date();let a,b;if(x.banned){a='Banido';b='badge-banned'}else if(e>n){a='Ativo';b='badge-active'}else{a='Expirado';b='badge-expired'}
+return `<tr><td>${x.id}</td><td>${x.username}</td><td style="font-family:'Fira Code',monospace;font-size:11px;color:#666">${(x.hwid||'—').substring(0,16)}</td><td style="font-size:12px">${e.toLocaleDateString('pt-BR')}</td><td><span class="badge ${b}">${a}</span></td><td>${x.banned?`<button class="btn btn-success btn-sm" onclick="unbanUser(${x.id})">Desbanir</button>`:`<button class="btn btn-danger btn-sm" onclick="banUser(${x.id})">Banir</button>`}<button class="btn btn-warning btn-sm" onclick="resetHwid(${x.id})">Reset HWID</button></td></tr>`
+}).join(''):'<tr><td colspan="6"><div style="color:#555;font-size:13px;padding:12px;text-align:center">Nenhum usuário encontrado</div></td></tr>'}
 async function banUser(i){if(!confirm('Banir usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/ban',{user_id:i});if(r.success){toast('Usuário banido','success');loadUsers()}else toast(r.error||'Erro','error')}
 async function unbanUser(i){if(!confirm('Desbanir usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/unban',{user_id:i});if(r.success){toast('Usuário desbanido','success');loadUsers()}else toast(r.error||'Erro','error')}
 async function resetHwid(i){if(!confirm('Resetar HWID do usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/reset_hwid',{user_id:i});if(r.success){toast('HWID resetado','success');loadUsers()}else toast(r.error||'Erro','error')}
-async function loadLogs(){const r=await api('POST','/api/admin/logs');if(!r.success)return;const c=document.getElementById('logs-container');c.innerHTML='<table><thead><tr><th>ID</th><th>Ação</th><th>Usuário</th><th>Detalhes</th><th>IP</th><th>Data</th></tr></thead><tbody>'+(r.logs||[]).map(x=>`<tr><td>${x.id}</td><td>${x.action}</td><td>${x.username}</td><td>${x.details||'-'}</td><td>${x.ip||'-'}</td><td>${x.created_at||'-'}</td></tr>`).join('')+'</tbody></table>'}
-async function sendAnnounce(){const m=document.getElementById('announce-msg').value.trim();if(!m)return toast('Digite uma mensagem','error');const r=await api('POST','/api/admin/announce',{message:m,type:document.getElementById('announce-type').value});if(r.success){toast('Anúncio enviado','success');document.getElementById('announce-msg').value=''}else toast(r.error||'Erro','error')}
-async function loadConfig(){const r=await api('POST','/api/admin/config');if(!r.success)return;document.getElementById('config-display').innerHTML='<pre style="background:#12121f;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px;color:#ccc">'+JSON.stringify(r.config||r,null,2)+'</pre>'}
+async function loadLogs(){document.getElementById('logs-container').innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';const r=await api('POST','/api/admin/logs');if(!r.success){document.getElementById('logs-container').innerHTML='<div style="color:#ff5252;font-size:13px">Erro ao carregar logs</div>';return}
+const logs=r.logs||[];document.getElementById('logs-container').innerHTML=logs.length?`<div class="table-wrap"><table><thead><tr><th>ID</th><th>Ação</th><th>Usuário</th><th>Detalhes</th><th>IP</th><th>Data</th></tr></thead><tbody>${logs.map(x=>`<tr><td>${x.id}</td><td>${x.action}</td><td>${x.username}</td><td>${x.details||'—'}</td><td style="font-family:'Fira Code',monospace;font-size:11px;color:#666">${x.ip||'—'}</td><td>${x.created_at||'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div style="color:#555;font-size:13px;text-align:center;padding:20px">Nenhum log encontrado</div>'}
+async function sendAnnounce(){const m=document.getElementById('announce-msg').value.trim();if(!m)return toast('Digite uma mensagem','error');const r=await api('POST','/api/admin/announce',{message:m,type:document.getElementById('announce-type').value});if(r.success){toast('Anúncio enviado com sucesso','success');document.getElementById('announce-msg').value=''}else toast(r.error||'Erro ao enviar','error')}
+async function loadConfig(){document.getElementById('config-display').innerHTML='<div class="loading"><div class="spinner"></div>Carregando...</div>';const r=await api('POST','/api/admin/config');if(!r.success){document.getElementById('config-display').innerHTML='<div style="color:#ff5252;font-size:13px">Erro ao carregar</div>';return}
+document.getElementById('config-display').innerHTML='<pre class="config-pre">'+JSON.stringify(r.config||r,null,2)+'</pre>'}
+
+/* modal helpers */
+function m(h){document.getElementById('modals').innerHTML='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal-box">'+h+'</div></div>'}
+function c(b){b.closest('.modal-overlay').remove()}
+function f(){document.querySelector('.modal-overlay')?.remove()}
+
+/* particles */
+let _p=false;
+function particles(){if(_p)return;_p=true;const c=document.getElementById('particles');for(let i=0;i<30;i++){const e=document.createElement('div');e.className='particle';const s=2+Math.random()*4;e.style.width=s+'px';e.style.height=s+'px';e.style.left=Math.random()*100+'%';e.style.animationDuration=(15+Math.random()*25)+'s';e.style.animationDelay=Math.random()*20+'s';c.appendChild(e)}}
+
+/* init */
 loadDashboard()
 </script>
 </body>
