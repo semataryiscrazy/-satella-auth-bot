@@ -2,17 +2,20 @@
 #include "Utils.h"
 #include "Scope.h"
 #include "EntityCache.h"
-#include <shared_mutex>
-
+#include <chrono>
+#include <atomic>
 static std::unordered_map<uintptr_t, EntityData> g_cache;
-static std::shared_mutex g_cacheMutex;
+static WinSharedMutex g_cacheMutex;
+static WinMutex g_cacheWriteMutex;
 UnityMatrix cachedMatrix{};
 int cachedScreenW = 0, cachedScreenH = 0;
 uintptr_t cachedLocalPlayer = 0;
 uint64_t lastEntityUpdate = 0;
+std::atomic<uint64_t> renderMatrixTimestamp{0};
 
 std::unordered_map<uintptr_t, EntityData>& GetEntityCache() { return g_cache; }
-std::shared_mutex& GetCacheMutex() { return g_cacheMutex; }
+WinSharedMutex& GetCacheMutex() { return g_cacheMutex; }
+WinMutex& GetCacheWriteMutex() { return g_cacheWriteMutex; }
 
 static uintptr_t cachedGE = 0;
 static uintptr_t cachedLocal = 0;
@@ -55,9 +58,9 @@ static void CacheLoopImpl() {
     while (cacheRunning) {
         uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
-        if (now - lastEntityUpdate < 50) { std::this_thread::sleep_for(std::chrono::milliseconds(5)); continue; }
+        if (now - lastEntityUpdate < 50) { WinSleepFor(5); continue; }
 
-        uintptr_t ge = GetEngine(); if (ge == 0) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); continue; }
+        uintptr_t ge = GetEngine(); if (ge == 0) { WinSleepFor(50); continue; }
 
         // Atualiza camera matrix
         uintptr_t ccm = Ler<uintptr_t>(ge + 0x74);
@@ -72,12 +75,12 @@ static void CacheLoopImpl() {
             }
         }
 
-        cachedLocalPlayer = GetLocal(ge); if (cachedLocalPlayer == 0) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); continue; }
+        cachedLocalPlayer = GetLocal(ge); if (cachedLocalPlayer == 0) { WinSleepFor(50); continue; }
 
         lastEntityUpdate = now;
 
         {
-            std::lock_guard<std::shared_mutex> lock(g_cacheMutex);
+            WinWriteLockGuard lock(g_cacheMutex);
             for (auto it = g_cache.begin(); it != g_cache.end();)
                 if (now - it->second.lastUpdate > 6000) it = g_cache.erase(it); else ++it;
         }
@@ -155,7 +158,7 @@ static void CacheLoopImpl() {
 
         fr.valid = true;
         fr.lastUpdate = now;
-        { std::lock_guard<std::shared_mutex> lock(g_cacheMutex); g_cache[e] = fr; }
+        { WinWriteLockGuard lock(g_cacheMutex); g_cache[e] = fr; }
     }
     }
 }

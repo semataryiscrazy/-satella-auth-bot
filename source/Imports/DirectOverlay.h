@@ -433,7 +433,7 @@ void DirectOverlaySetup(DirectOverlayCallback callback) {
 
 void DirectOverlaySetup(DirectOverlayCallback callback, HWND _targetWindow) {
 	drawLoopCallback = callback;
-	std::thread(OverlayThread, _targetWindow).detach();
+	CreateDetachedThread([=]() { OverlayThread((LPVOID)_targetWindow); });
 	// CreateThread(0, 0, OverlayThread, _targetWindow, 0, NULL);
 }
 

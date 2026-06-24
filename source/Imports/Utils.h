@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sstream>
+#include <process.h>
 
 // Proccess
 inline uintptr_t il2cpp = 0x0;

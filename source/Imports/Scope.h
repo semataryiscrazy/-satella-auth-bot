@@ -2,14 +2,88 @@
 
 #include <vector>
 #include <unordered_map>
-#include <mutex>
 #include <atomic>
+#include <windows.h>
 
 namespace ImGui {} // ensure namespace exists before using directive
 using namespace ImGui;
 
 class Discord;
 inline Discord* DiscordRPC;
+
+// ─── Win32 threading primitives (replaces <mutex>, <thread>, <shared_mutex>) ───
+
+struct WinMutex {
+    CRITICAL_SECTION cs;
+    WinMutex() { InitializeCriticalSection(&cs); }
+    ~WinMutex() { DeleteCriticalSection(&cs); }
+    WinMutex(const WinMutex&) = delete;
+    WinMutex& operator=(const WinMutex&) = delete;
+};
+
+struct WinSharedMutex {
+    SRWLOCK srw;
+    WinSharedMutex() { InitializeSRWLock(&srw); }
+    WinSharedMutex(const WinSharedMutex&) = delete;
+    WinSharedMutex& operator=(const WinSharedMutex&) = delete;
+};
+
+struct WinLockGuard {
+    WinMutex& mtx;
+    WinLockGuard(WinMutex& m) : mtx(m) { EnterCriticalSection(&mtx.cs); }
+    ~WinLockGuard() { LeaveCriticalSection(&mtx.cs); }
+    WinLockGuard(const WinLockGuard&) = delete;
+    WinLockGuard& operator=(const WinLockGuard&) = delete;
+};
+
+struct WinWriteLockGuard {
+    WinSharedMutex& mtx;
+    WinWriteLockGuard(WinSharedMutex& m) : mtx(m) { AcquireSRWLockExclusive(&mtx.srw); }
+    ~WinWriteLockGuard() { ReleaseSRWLockExclusive(&mtx.srw); }
+    WinWriteLockGuard(const WinWriteLockGuard&) = delete;
+    WinWriteLockGuard& operator=(const WinWriteLockGuard&) = delete;
+};
+
+struct WinSharedReadLockGuard {
+    WinSharedMutex& mtx;
+    WinSharedReadLockGuard(WinSharedMutex& m) : mtx(m) { AcquireSRWLockShared(&mtx.srw); }
+    ~WinSharedReadLockGuard() { ReleaseSRWLockShared(&mtx.srw); }
+    WinSharedReadLockGuard(const WinSharedReadLockGuard&) = delete;
+    WinSharedReadLockGuard& operator=(const WinSharedReadLockGuard&) = delete;
+};
+
+template<typename F>
+struct WinThreadData {
+    F f;
+    WinThreadData(F&& f_) : f(std::move(f_)) {}
+    static DWORD WINAPI Proc(LPVOID p) {
+        WinThreadData* d = static_cast<WinThreadData*>(p);
+        d->f();
+        delete d;
+        return 0;
+    }
+};
+
+template<typename F>
+HANDLE CreateJoinableThread(F f) {
+    WinThreadData<F>* d = new WinThreadData<F>(std::move(f));
+    HANDLE h = CreateThread(nullptr, 0, &WinThreadData<F>::Proc, d, 0, nullptr);
+    if (!h) { delete d; return nullptr; }
+    return h;
+}
+
+template<typename F>
+void CreateDetachedThread(F f) {
+    WinThreadData<F>* d = new WinThreadData<F>(std::move(f));
+    HANDLE h = CreateThread(nullptr, 0, &WinThreadData<F>::Proc, d, 0, nullptr);
+    if (h) CloseHandle(h);
+    else delete d;
+}
+
+inline void WinSleepFor(DWORD ms) { Sleep(ms); }
+inline void WinThisThreadYield() { Sleep(0); }
+
+// ─── End Win32 threading primitives ───
 
 inline struct {
     const char* Titulo = AY_OBFUSCATE("Satella");
@@ -29,6 +103,7 @@ inline struct {
     int Menu = VK_INSERT;
     int GhostHack;
     int RotatePlayer = 0;
+    int SilentAim = 0;
 } KeysBind;
 
 // === AIMBOT ===
@@ -115,7 +190,7 @@ inline bool FPSCounter = true;
 inline bool WeaponAttributesEnabled = false;
 inline int WeaponAttributesLevel = 0; // 0=Lv1, 1=Lv2, 2=Lv3, 3=Lv4
 inline bool SpinBot = false;
-inline int SpinbotMode = 0; // 0=Continuous, 1=Random, 2=45° Step
+inline int SpinbotMode = 0; // 0=Continuous, 1=Random, 2=45 Step
 inline float SpinbotSpeed = 5.0f;
 inline bool ThirdPerson = false;
 inline float ThirdPersonDist = 4.0f;
@@ -128,11 +203,13 @@ inline bool BypassAnticheat = false;
 inline bool AimbotTrick = false;
 inline bool PrecisionMode = false;
 
+inline bool GhostHack = false;
+
 // ─── Entity Cache Centralizado ───
 struct EntityData;
 struct UnityMatrix;
 extern std::unordered_map<uintptr_t, EntityData>& GetEntityCache();
-extern std::mutex& GetCacheWriteMutex();
+extern WinMutex& GetCacheWriteMutex();
 extern uintptr_t cachedLocalPlayer;
 extern UnityMatrix renderMatrix;
 extern std::atomic<uint64_t> renderMatrixTimestamp;

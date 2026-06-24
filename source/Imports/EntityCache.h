@@ -2,7 +2,6 @@
 #include "../Unity/Vector3.h"
 #include "Process.h"
 #include <unordered_map>
-#include <shared_mutex>
 #include <cstdint>
 
 #pragma pack(push, 1)
@@ -19,6 +18,7 @@ struct EntityData {
     bool garota = false;
     uint64_t lastUpdate = 0;
     std::string name;
+    std::string weaponName;
 };
 #pragma pack(pop)
 
@@ -27,4 +27,4 @@ extern int cachedScreenW, cachedScreenH;
 extern uintptr_t cachedLocalPlayer;
 
 std::unordered_map<uintptr_t, EntityData>& GetEntityCache();
-std::shared_mutex& GetCacheMutex();
+WinSharedMutex& GetCacheMutex();

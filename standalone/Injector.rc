@@ -1,3 +1,0 @@
-#include "resource.h"
-
-IDR_DLL1 RCDATA "..\\Satella.dll"

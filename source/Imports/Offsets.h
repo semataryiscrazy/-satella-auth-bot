@@ -122,6 +122,14 @@ public:
     static inline uintptr_t WD_DamageLimb = string2Offset(AY_OBFUSCATE("0xB0"));
     static inline uintptr_t WD_PrefireDelay = string2Offset(AY_OBFUSCATE("0x140"));
 
+    // === WEAPON PARAMS (inside WeaponData) ===
+    static inline uintptr_t WeaponParams = string2Offset(AY_OBFUSCATE("0x68"));
+    static inline uintptr_t WeaponParams_FireInterval = string2Offset(AY_OBFUSCATE("0x0"));
+    static inline uintptr_t WeaponParams_RepeatFireInterval = string2Offset(AY_OBFUSCATE("0x4"));
+    static inline uintptr_t WeaponParams_MultiFireInterval = string2Offset(AY_OBFUSCATE("0x8"));
+    static inline uintptr_t Weapon_AddFireSpeed = string2Offset(AY_OBFUSCATE("0x10"));
+    static inline uintptr_t PlayerAttributes_FireIntervalScale = string2Offset(AY_OBFUSCATE("0x18"));
+
     // === EXTRAS ===
     static inline uintptr_t Vida = string2Offset(AY_OBFUSCATE("0x10"));
     static inline uintptr_t pomba = string2Offset(AY_OBFUSCATE("0x488"));

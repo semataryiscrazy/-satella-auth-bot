@@ -11,7 +11,6 @@
 #include <shlwapi.h>
 #include <Wbemidl.h>
 #include <regex>
-#include <thread>
 #include <psapi.h>
 #include <string>
 #include <vector>

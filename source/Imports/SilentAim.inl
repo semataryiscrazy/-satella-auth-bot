@@ -1,7 +1,6 @@
 #include "SilentAim.h"
 #include "EntityCache.h"
 #include <cmath>
-#include <shared_mutex>
 #include <algorithm>
 
 AimSettings g_Aim;
@@ -26,7 +25,7 @@ static EntityData* FindClosestEnemy() {
     float bestDist = g_Aim.Fov;
     float cx = SWidth * 0.5f, cy = SHeight * 0.5f;
 
-    std::shared_lock lock(GetCacheMutex());
+    WinSharedReadLockGuard lock(GetCacheMutex());
     for (auto& [addr, c] : GetEntityCache()) {
         if (!c.valid || c.isTeam || c.dying) continue;
         Vector3 hp = GetHitboxPosition(c, g_Aim.HitBox);
@@ -45,18 +44,18 @@ static EntityData* FindClosestEnemy() {
 static void AimLoopImpl() {
     while (g_AimRunning) {
         if (!g_Aim.Enabled || !Auth.Attached || !cachedLocalPlayer) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            WinSleepFor(10);
             continue;
         }
         bool keyHeld = (GetAsyncKeyState(g_Aim.KeyBind) & 0x8000) != 0;
         if (!keyHeld) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            WinSleepFor(1);
             continue;
         }
 
         EntityData* target = FindClosestEnemy();
         if (!target) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            WinSleepFor(1);
             continue;
         }
 
@@ -65,11 +64,11 @@ static void AimLoopImpl() {
 
         uint32_t collider = Ler<uint32_t>(headColliderAddr);
         if (collider == 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            WinSleepFor(1);
             continue;
         }
         Escrever<uint32_t>(lockedAimAddr, collider);
-        std::this_thread::sleep_for(std::chrono::milliseconds(g_Aim.UpdateMs));
+        WinSleepFor(g_Aim.UpdateMs);
         Escrever<uint32_t>(lockedAimAddr, 0);
     }
 }

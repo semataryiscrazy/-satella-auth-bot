@@ -18,6 +18,8 @@
 #include "Cfg/Obfuscation.h"
 #include "Imports/LockAim.cpp"
 #include "Imports/NoRecoil.cpp"
+#include "Imports/SilentAim.cpp"
+#include "Imports/PrecisionMode.cpp"
 HINSTANCE g_hDll = nullptr;
 bool g_Unload = false;
 ImFont* FontAwesomeRegular = nullptr;
@@ -138,7 +140,7 @@ void DesenharESP(int width, int height) {
 
     int entityCount = 0;
     AimbotDistMax = 9999.9f; AimbotTarget = 0;
-    { std::lock_guard<std::mutex> lock(GetCacheWriteMutex());
+    { WinLockGuard lock(GetCacheWriteMutex());
     for (auto& [addr, c] : GetEntityCache()) {
         if (!c.valid) continue;
         if (c.isTeam && !ESPMostrarTime) continue;
@@ -432,21 +434,21 @@ void runRenderTick() {
                     strcpy(Auth.Usuario, savedUser);
                     strcpy(Auth.Senha, savedPass);
                     loggingIn = true;
-                    std::thread([=]() {
+                    CreateDetachedThread([=]() {
                         bool ok = ka_init() && ka_login(Auth.Usuario, Auth.Senha);
                         loggingIn = false;
                         if (ok) {
                             CurrentWindow = 1; CurrentTab = 2;
                             Auth.Autenticado = true;
                             NotificationManager::AdicionarNotificacao("Bem-Vindo, " + std::string(Auth.Usuario) + "!");
-                            std::thread(NetworkInit).detach();
-                            std::thread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); }).detach();
+                            CreateDetachedThread(NetworkInit);
+                            CreateDetachedThread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); });
                         } else {
                             memset(Auth.Usuario, 0, sizeof(Auth.Usuario));
                             memset(Auth.Senha, 0, sizeof(Auth.Senha));
-                            NotificationManager::AdicionarNotificacao("Auto-login falhou, faca login manual", 5.0f, true);
+                            NotificationManager::AdicionarNotificacao("Auto-login falhou, faca login manual", 5.0f);
                         }
-                    }).detach();
+                    });
                 }
             }
             const float winW = 560, winH = 380;
@@ -504,7 +506,7 @@ void runRenderTick() {
                     if (ImGui::Button("Entrar", ImVec2(inputW, btnH))) {
                         loggingIn = true;
                         if (strlen(Auth.Usuario) > 0 && strlen(Auth.Senha) > 0) {
-                            std::thread([=]() {
+                            CreateDetachedThread([=]() {
                                 bool ok = ka_init() && ka_login(Auth.Usuario, Auth.Senha);
                                 loggingIn = false;
                                 if (ok) {
@@ -513,16 +515,16 @@ void runRenderTick() {
                                     CurrentWindow = 1; CurrentTab = 2;
                                     Auth.Autenticado = true;
 
-                                    std::thread(NetworkInit).detach();
-                                    std::thread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); }).detach();
+                                    CreateDetachedThread(NetworkInit);
+                                    CreateDetachedThread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); });
                                 } else {
                                     const char* err = ka_get_error();
-                                    NotificationManager::AdicionarNotificacao(err && err[0] ? err : "Falha no AUTH", 5.0f, true);
+                                    NotificationManager::AdicionarNotificacao(err && err[0] ? err : "Falha no AUTH", 5.0f);
                                 }
-                            }).detach();
+                            });
                         } else {
                             loggingIn = false;
-                            NotificationManager::AdicionarNotificacao("Preencha usuario e senha", 5.0f, true);
+                            NotificationManager::AdicionarNotificacao("Preencha usuario e senha", 5.0f);
                         }
                     }
                     ImGui::PopStyleColor(3);
@@ -564,7 +566,7 @@ void runRenderTick() {
                     if (ImGui::Button("Registrar", ImVec2(inputW, btnH))) {
                         if (strlen(RegUser) > 0 && strlen(RegPass) > 0 && strlen(RegKey) > 0) {
                             regLoading = true;
-                            std::thread([=]() {
+                            CreateDetachedThread([=]() {
                                 bool ok = ka_init() && ka_register(RegUser, RegPass, RegKey);
                                 regLoading = false;
                                 if (ok) {
@@ -575,11 +577,11 @@ void runRenderTick() {
                                     REGing = false;
                                 } else {
                                     const char* err = ka_get_error();
-                                    NotificationManager::AdicionarNotificacao(err && err[0] ? err : "Falha no registro", 5.0f, true);
+                                    NotificationManager::AdicionarNotificacao(err && err[0] ? err : "Falha no registro", 5.0f);
                                 }
-                            }).detach();
+                            });
                         } else {
-                            NotificationManager::AdicionarNotificacao("Preencha todos os campos", 5.0f, true);
+                            NotificationManager::AdicionarNotificacao("Preencha todos os campos", 5.0f);
                         }
                     }
                     ImGui::PopStyleColor(3);
@@ -605,8 +607,8 @@ void runRenderTick() {
             static bool g_AutoStarted = false;
             if (Auth.Autenticado && !g_AutoStarted) {
                 g_AutoStarted = true;
-                std::thread(NetworkInit).detach();
-                std::thread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); }).detach();
+                CreateDetachedThread(NetworkInit);
+                CreateDetachedThread([]() { Sleep(2000); LoadLibraryAndHook(); _0xW3X4Y5Z6::Start(); _0xPrecision::Start(); LockAim::Start(); });
             }
 
             JUNK(); AntiDebugCheck();
@@ -647,7 +649,7 @@ void runRenderTick() {
                     {
                         ImGui::Checkbox("Aimbot", &AimbotLegit);
                         if (AimbotLegit) {
-                            ImGui::KeyBind("Key", &AimbotKeyBind, (int*)0);
+                            ImGui::KeyBind("Key", &AimbotKeyBind);
                             ImGui::SliderInt("FOV", &AimbotFOV, 10, 500);
                             ImGui::SliderInt("Max Distance", &AimbotMaxDistance, 10, 500);
                             static const char* delayOpts[] = { "Instant", "235ms", "325ms", "415ms" };
@@ -665,7 +667,7 @@ void runRenderTick() {
                     {
                         ImGui::Checkbox("Silent Aim", &AimSilent);
                         if (AimSilent) {
-                            ImGui::KeyBind("Key", &SilentAimKeyBind, (int*)0);
+                            ImGui::KeyBind("Key", &SilentAimKeyBind);
                             ImGui::SliderFloat("FOV", &SilentAimFOV, 1.0f, 180.0f, "%.0f");
                             ImGui::SliderInt("Distance", &SilentAimDistance, 10, 500);
                             static const char* hitboxOpts[] = { "Head", "Body" };
@@ -762,7 +764,7 @@ void runRenderTick() {
                         if (SpinBot) {
                             ImGui::Combo("Mode", &SpinbotMode, "Continuous\0Random\045\xc2\xb0 Step\0");
                             ImGui::SliderFloat("Speed", &SpinbotSpeed, 1.0f, 30.0f, "%.0f");
-                            ImGui::KeyBind("Key", &KeysBind.RotatePlayer, (int*)0);
+                            ImGui::KeyBind("Key", &KeysBind.RotatePlayer);
                         }
                     }
                     ImGui::EndCustomChild();
@@ -785,7 +787,7 @@ void runRenderTick() {
                             SetWindowDisplayAffinity(hwnd, StreamMode ? 0x11 : 0);
                         }
                         ImGui::Separator();
-                        ImGui::KeyBind("Menu Bind", &KeysBind.Menu, (int*)0);
+                        ImGui::KeyBind("Menu Bind", &KeysBind.Menu);
                         ImGui::Separator();
                         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(180, 40, 50, 200));
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(210, 50, 60, 230));
@@ -795,7 +797,7 @@ void runRenderTick() {
                             ImGui::Separator();
                             ImGui::TextColored(ImVec4(1,0.2f,0.2f,1), "Conexão perdida!");
                             if (ImGui::Button("Reconectar", ImVec2(-1, 30))) {
-                                std::thread(NetworkInit).detach();
+                                CreateDetachedThread(NetworkInit);
                             }
                         }
                     }
@@ -1277,10 +1279,6 @@ void InitIdow() {
         }
     }
 }
-
-#include "Imports/SilentAim.cpp"
-
-#include "Imports/PrecisionMode.cpp"
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved) {
     switch (fdwReason) {

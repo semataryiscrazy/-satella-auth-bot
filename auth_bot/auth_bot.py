@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify
 import os
 import re
-import urllib.request
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 config_path = os.path.join(script_dir, "config.json")
@@ -23,7 +22,6 @@ if os.path.exists(config_path):
         CONFIG = json.load(f)
 
 CONFIG["token"] = os.environ.get("DISCORD_TOKEN", CONFIG.get("token", ""))
-CONFIG["webhook_url"] = os.environ.get("WEBHOOK_URL", CONFIG.get("webhook_url", ""))
 CONFIG["api_port"] = int(os.environ.get("API_PORT", CONFIG.get("api_port", 5000)))
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -763,7 +761,6 @@ def api_admin_config():
     if data.get("action") == "set":
         if "pix_key" in data: CONFIG["pix_key"] = data["pix_key"]
         if "pix_value" in data: CONFIG["pix_value"] = data["pix_value"]
-        if "webhook_url" in data: CONFIG["webhook_url"] = data["webhook_url"]
         log_action("admin_config", admin, "config atualizada", request.remote_addr)
         return jsonify({"success": True, "message": "Configura\u00e7\u00e3o salva"})
     return jsonify({"success": False, "error": "A\u00e7\u00e3o inv\u00e1lida"})
@@ -894,28 +891,6 @@ def api_logs():
             rows = get_db().execute("SELECT * FROM logs ORDER BY id DESC LIMIT 100").fetchall()
     return jsonify({"success": True, "logs": [dict(r) if not isinstance(r, dict) else r for r in rows]})
 
-def send_webhook(content: str):
-    wh_url = CONFIG.get("webhook_url", "")
-    if not wh_url or "AQUI" in wh_url:
-        return
-    try:
-        wh_data = json.dumps({"content": content})
-        req = urllib.request.Request(wh_url, data=wh_data.encode(), headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=5)
-    except:
-        pass
-
-@app.route("/api/notify_download", methods=["POST", "OPTIONS"])
-def api_notify_download():
-    if request.method == "OPTIONS":
-        return jsonify({"success": True})
-    data = request.get_json() or {}
-    username = data.get("username", "")
-    ip = request.remote_addr or ""
-    send_webhook(f"\U0001f4e5 **Download Satella.dll**\nUsu\u00e1rio: `{username}`\nIP: `{ip}`")
-    log_action("download", username, f"IP:{ip}", ip)
-    return jsonify({"success": True})
-
 @app.route("/api/download", methods=["GET", "OPTIONS"])
 def api_download():
     if request.method == "OPTIONS":
@@ -930,7 +905,6 @@ def api_download():
             return jsonify({"success": False, "error": "DLL n\u00e3o encontrada no servidor"}), 404
     username = tokens[token]["username"]
     ip = request.remote_addr or ""
-    send_webhook(f"\U0001f4e5 **Download Satella.dll**\nUsu\u00e1rio: `{username}`\nIP: `{ip}`")
     log_action("download", username, f"IP:{ip}", ip)
     return app.response_class(
         response=open(dll_path, "rb"),
@@ -949,7 +923,6 @@ def api_admin_announce():
     msg = data.get("message", "").strip()
     if not msg:
         return jsonify({"success": False, "error": "Mensagem obrigat\u00f3ria"})
-    send_webhook(f"\U0001f4e2 **An\u00fancio** ({admin}):\n{msg}")
     log_action("announce", admin, msg[:50], request.remote_addr)
     return jsonify({"success": True})
 

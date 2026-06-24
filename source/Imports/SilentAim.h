@@ -1,6 +1,5 @@
 #pragma once
 #include <atomic>
-#include <thread>
 #include "../Unity/Vector3.h"
 
 struct AimSettings {
