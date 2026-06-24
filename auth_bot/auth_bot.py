@@ -462,8 +462,10 @@ app = Flask(__name__)
 @app.route("/")
 def serve_panel():
     idx_path = os.path.join(script_dir, "index.html")
-    with open(idx_path, encoding="utf-8") as f:
-        return f.read()
+    if os.path.exists(idx_path):
+        with open(idx_path, encoding="utf-8") as f:
+            return f.read()
+    return """<!DOCTYPE html><html lang=pt-BR><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Satella Painel</title><style>body{font-family:'Segoe UI',sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.box{background:#1a1a2e;padding:40px;border-radius:12px;width:340px;text-align:center;box-shadow:0 0 30px rgba(180,0,255,.15)}h1{color:#b388ff;margin-bottom:12px}p{color:#888;font-size:14px}</style></head><body><div class=box><h1>Satella</h1><p>Painel administrativo</p><p style="color:#69f0ae;font-size:13px">Servidor online</p></div></body></html>"""
 
 admin_tokens = {}
 
