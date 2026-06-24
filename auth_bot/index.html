@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Satella Painel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0d0d0d;color:#eee;min-height:100vh}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+#login-screen.hidden{display:none}
+.login-box{background:#1a1a2e;padding:40px;border-radius:12px;width:340px;box-shadow:0 0 30px rgba(180,0,255,.15)}
+.login-box h1{text-align:center;color:#b388ff;margin-bottom:24px;font-size:24px}
+.login-box input{width:100%;padding:12px;margin-bottom:12px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:14px}
+.login-box input:focus{outline:none;border-color:#b388ff}
+.login-box button{width:100%;padding:12px;background:#7c4dff;border:none;border-radius:6px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+.login-box button:hover{background:#651fff}
+.login-error{color:#ff5252;font-size:13px;text-align:center;margin-top:8px;display:none}
+#app{display:none}
+#app.show{display:flex;min-height:100vh}
+.sidebar{width:220px;background:#12121f;padding:20px 0;flex-shrink:0;border-right:1px solid #1e1e3a}
+.sidebar h2{text-align:center;color:#b388ff;margin-bottom:24px;font-size:18px}
+.sidebar a{display:block;padding:12px 20px;color:#888;text-decoration:none;font-size:14px;transition:all .2s;cursor:pointer}
+.sidebar a:hover{color:#eee;background:#1a1a2e}
+.sidebar a.active{color:#b388ff;background:#1a1a2e;border-left:3px solid #7c4dff}
+.main{flex:1;padding:24px;overflow-y:auto}
+.page{display:none}
+.page.active{display:block}
+h3{color:#b388ff;margin-bottom:16px;font-size:18px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:#1a1a2e;padding:16px;border-radius:8px;text-align:center}
+.stat-card .num{font-size:28px;font-weight:700;color:#fff}
+.stat-card .label{font-size:12px;color:#888;margin-top:4px}
+.stat-card.green .num{color:#69f0ae}
+.stat-card.red .num{color:#ff5252}
+.stat-card.blue .num{color:#40c4ff}
+table{width:100%;border-collapse:collapse;background:#1a1a2e;border-radius:8px;overflow:hidden;font-size:13px}
+th{background:#1e1e3a;color:#b388ff;padding:10px 12px;text-align:left;font-weight:600}
+td{padding:8px 12px;border-top:1px solid #1e1e3a;color:#ccc}
+tr:hover td{background:#1e1e3a}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;transition:background .2s;margin:2px}
+.btn-primary{background:#7c4dff;color:#fff}
+.btn-primary:hover{background:#651fff}
+.btn-danger{background:#d32f2f;color:#fff}
+.btn-danger:hover{background:#b71c1c}
+.btn-success{background:#2e7d32;color:#fff}
+.btn-success:hover{background:#1b5e20}
+.btn-warning{background:#f57c00;color:#fff}
+.btn-warning:hover{background:#e65100}
+.btn-sm{padding:5px 10px;font-size:12px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:13px;color:#888;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:10px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px}
+.form-row{display:flex;gap:12px;flex-wrap:wrap}
+.form-row .form-group{flex:1;min-width:120px}
+.actions{margin:12px 0;display:flex;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:6px;color:#fff;font-size:14px;z-index:999;display:none;max-width:400px}
+.toast.show{display:block}
+.toast.success{background:#2e7d32}
+.toast.error{background:#c62828}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:12px}
+.pagination a{padding:6px 12px;border-radius:4px;background:#1a1a2e;color:#aaa;cursor:pointer;font-size:13px}
+.pagination a.active{background:#7c4dff;color:#fff}
+.pagination a:hover{background:#1e1e3a}
+.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filter-bar input{padding:8px 12px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px;flex:1;min-width:150px}
+#sair{color:#ff5252!important}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#0d0d0d}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="login-screen">
+<div class="login-box">
+<h1>Satella Painel</h1>
+<input type="text" id="login-user" placeholder="Usuário" autocomplete="off">
+<input type="password" id="login-pass" placeholder="Senha">
+<button onclick="login()">Entrar</button>
+<div class="login-error" id="login-error">Credenciais inválidas</div>
+</div>
+</div>
+<div id="app">
+<div class="sidebar">
+<h2>Satella</h2>
+<a class="active" onclick="showPage('dashboard')">📊 Dashboard</a>
+<a onclick="showPage('keys')">🔑 Keys</a>
+<a onclick="showPage('users')">👥 Usuários</a>
+<a onclick="showPage('logs')">📋 Logs</a>
+<a onclick="showPage('announce')">📢 Anunciar</a>
+<a onclick="showPage('config')">⚙️ Config</a>
+<a id="sair" onclick="logout()">🚪 Sair</a>
+</div>
+<div class="main">
+<div class="page active" id="page-dashboard"><h3>Dashboard</h3><div class="stats-grid" id="stats"></div></div>
+<div class="page" id="page-keys">
+<h3>Gerenciar Keys</h3>
+<div class="filter-bar"><input type="text" id="key-search" placeholder="Buscar key..." oninput="loadKeys()"></div>
+<div class="actions">
+<button class="btn btn-primary" onclick="showGenModal()">Gerar Keys</button>
+<button class="btn btn-success" onclick="showAddModal()">Adicionar Key</button>
+<button class="btn btn-warning" onclick="showAddTimeModal()">Adicionar Tempo</button>
+</div>
+<table><thead><tr><th>ID</th><th>Key</th><th>Dias</th><th>Usado por</th><th>Usado em</th><th>Criado em</th><th>Ações</th></tr></thead><tbody id="keys-body"></tbody></table>
+<div class="pagination" id="keys-pages"></div>
+</div>
+<div class="page" id="page-users">
+<h3>Usuários</h3>
+<div class="filter-bar"><input type="text" id="user-search" placeholder="Buscar usuário..." oninput="loadUsers()"></div>
+<table><thead><tr><th>ID</th><th>Usuário</th><th>HWID</th><th>Expira</th><th>Status</th><th>Ações</th></tr></thead><tbody id="users-body"></tbody></table>
+<div class="pagination" id="users-pages"></div>
+</div>
+<div class="page" id="page-logs"><h3>Logs</h3><div id="logs-container"></div></div>
+<div class="page" id="page-announce">
+<h3>Enviar Anúncio</h3>
+<textarea id="announce-msg" style="width:100%;height:120px;padding:10px;border:1px solid #333;border-radius:6px;background:#12121f;color:#eee;font-size:13px;resize:vertical" placeholder="Mensagem do anúncio..."></textarea>
+<div class="form-group" style="margin-top:8px"><label>Tipo</label><select id="announce-type"><option value="embed">Embed</option><option value="text">Texto</option></select></div>
+<button class="btn btn-primary" onclick="sendAnnounce()">Enviar</button>
+</div>
+<div class="page" id="page-config">
+<h3>Configuração</h3>
+<div id="config-display"></div>
+<button class="btn btn-primary" onclick="loadConfig()" style="margin-top:8px">Atualizar</button>
+</div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+<div id="modals"></div>
+<script>
+let TOKEN='',USER='';
+const API=window.location.origin;
+function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.className='toast show '+t;setTimeout(()=>e.classList.remove('show'),3000)}
+async function api(m,u,b){const h={'Content-Type':'application/json'};if(TOKEN)h['Authorization']='Bearer '+TOKEN;const r=await fetch(API+u,{method:m,headers:h,body:b?JSON.stringify(b):null});return r.json()}
+async function login(){const u=document.getElementById('login-user').value,p=document.getElementById('login-pass').value;const r=await api('POST','/api/admin/login',{username:u,password:p});if(r.success){TOKEN=r.token;USER=r.username;document.getElementById('login-screen').classList.add('hidden');document.getElementById('app').classList.add('show');loadDashboard()}else{document.getElementById('login-error').style.display='block'}}
+function logout(){TOKEN='';USER='';document.getElementById('login-screen').classList.remove('hidden');document.getElementById('app').classList.remove('show');document.getElementById('login-user').value='';document.getElementById('login-pass').value=''}
+function showPage(p){document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.sidebar a').forEach(e=>e.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.querySelector(`.sidebar a[onclick*="${p}"]`).classList.add('active');if(p==='dashboard')loadDashboard();else if(p==='keys')loadKeys();else if(p==='users')loadUsers();else if(p==='logs')loadLogs();else if(p==='config')loadConfig()}
+async function loadDashboard(){const r=await api('POST','/api/admin/stats');if(!r.success)return;const g=document.getElementById('stats');g.innerHTML=`
+<div class="stat-card blue"><div class="num">${r.total_keys||0}</div><div class="label">Total Keys</div></div>
+<div class="stat-card green"><div class="num">${r.avail_keys||0}</div><div class="label">Keys Disponíveis</div></div>
+<div class="stat-card red"><div class="num">${r.used_keys||0}</div><div class="label">Keys Usadas</div></div>
+<div class="stat-card blue"><div class="num">${r.total_users||0}</div><div class="label">Total Usuários</div></div>
+<div class="stat-card green"><div class="num">${r.active_users||0}</div><div class="label">Usuários Ativos</div></div>
+<div class="stat-card red"><div class="num">${r.banned_users||0}</div><div class="label">Usuários Banidos</div></div>
+`}
+let keysPage=0;
+async function loadKeys(){const r=await api('POST','/api/admin/keys');if(!r.success)return;const s=document.getElementById('key-search').value.toLowerCase();let k=r.keys||[];if(s)k=k.filter(x=>x.key.toLowerCase().includes(s));const t=document.getElementById('keys-body');t.innerHTML=k.map(x=>`<tr><td>${x.id}</td><td style="font-family:monospace">${x.key}</td><td>${x.duration_days}</td><td>${x.used_by||'-'}</td><td>${x.used_at||'-'}</td><td>${x.created_at||'-'}</td><td><button class="btn btn-danger btn-sm" onclick="delKey(${x.id})">Excluir</button></td></tr>`).join('')}
+async function delKey(i){if(!confirm('Excluir key ID '+i+'?'))return;const r=await api('POST','/api/admin/keys/delete',{id:i});if(r.success){toast('Key excluída','success');loadKeys()}else toast(r.error||'Erro','error')}
+function showGenModal(){document.getElementById('modals').innerHTML=`
+<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
+<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
+<h4 style="color:#b388ff;margin-bottom:16px">Gerar Keys</h4>
+<div class="form-group"><label>Quantidade (1-50)</label><input type="number" id="gen-qty" value="1" min="1" max="50"></div>
+<div class="form-group"><label>Dias de duração</label><input type="number" id="gen-days" value="30" min="0" max="3650"></div>
+<button class="btn btn-primary" onclick="genKeys()">Gerar</button>
+<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
+<div id="gen-result" style="margin-top:12px;font-size:13px"></div>
+</div></div>`}
+async function genKeys(){const q=document.getElementById('gen-qty').value,d=document.getElementById('gen-days').value;const r=await api('POST','/api/admin/keys/generate',{quantity:parseInt(q),days:parseInt(d)});if(r.success){document.getElementById('gen-result').innerHTML='<b>Keys geradas:</b><br>'+r.keys.map(k=>`<span style="font-family:monospace;color:#69f0ae">${k}</span>`).join('<br>');loadKeys()}else toast(r.error||'Erro','error')}
+function showAddModal(){document.getElementById('modals').innerHTML=`
+<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
+<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
+<h4 style="color:#b388ff;margin-bottom:16px">Adicionar Key</h4>
+<div class="form-group"><label>Key</label><input type="text" id="add-key" placeholder="AAAAA-BBBBB-CCCCC"></div>
+<div class="form-group"><label>Dias</label><input type="number" id="add-days" value="30"></div>
+<button class="btn btn-success" onclick="addKey()">Adicionar</button>
+<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
+</div></div>`}
+async function addKey(){const k=document.getElementById('add-key').value,d=document.getElementById('add-days').value;const r=await api('POST','/api/admin/keys/add',{key:k,days:parseInt(d)});if(r.success){toast('Key adicionada','success');loadKeys();document.querySelector('#modals>div').remove()}else toast(r.error||'Erro','error')}
+function showAddTimeModal(){document.getElementById('modals').innerHTML=`
+<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000" onclick="if(event.target===this)this.remove()">
+<div style="background:#1a1a2e;padding:24px;border-radius:12px;width:320px">
+<h4 style="color:#b388ff;margin-bottom:16px">Adicionar Tempo</h4>
+<div class="form-group"><label>Key</label><input type="text" id="time-key" placeholder="AAAAA-BBBBB-CCCCC"></div>
+<div class="form-group"><label>Dias extras</label><input type="number" id="time-days" value="30"></div>
+<button class="btn btn-warning" onclick="addTime()">Adicionar</button>
+<button class="btn" style="background:#333;color:#fff;margin-left:8px" onclick="this.closest('div[onclick]').remove()">Cancelar</button>
+</div></div>`}
+async function addTime(){const k=document.getElementById('time-key').value,d=document.getElementById('time-days').value;const r=await api('POST','/api/admin/keys/addtime',{key:k,days:parseInt(d)});if(r.success){toast(r.message||'OK','success');loadKeys();document.querySelector('#modals>div').remove()}else toast(r.error||'Erro','error')}
+async function loadUsers(){const r=await api('POST','/api/admin/users');if(!r.success)return;const s=document.getElementById('user-search').value.toLowerCase();let u=r.users||[];if(s)u=u.filter(x=>x.username.toLowerCase().includes(s));const t=document.getElementById('users-body');t.innerHTML=u.map(x=>{
+const exp=new Date(x.expires_at*1000);const now=new Date();const ativo=x.banned?'Banido':exp>now?'Ativo':'Expirado';const cor=x.banned?'#ff5252':exp>now?'#69f0ae':'#888'
+return `<tr><td>${x.id}</td><td>${x.username}</td><td style="font-family:monospace;font-size:11px">${(x.hwid||'-').substring(0,20)}</td><td>${exp.toLocaleString('pt-BR')}</td><td style="color:${cor};font-weight:600">${ativo}</td><td>${!x.banned?`<button class="btn btn-danger btn-sm" onclick="banUser(${x.id})">Banir</button>`:`<button class="btn btn-success btn-sm" onclick="unbanUser(${x.id})">Desbanir</button>`}<button class="btn btn-warning btn-sm" onclick="resetHwid(${x.id})">Reset HWID</button></td></tr>`
+}).join('')}
+async function banUser(i){if(!confirm('Banir usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/ban',{user_id:i});if(r.success){toast('Usuário banido','success');loadUsers()}else toast(r.error||'Erro','error')}
+async function unbanUser(i){if(!confirm('Desbanir usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/unban',{user_id:i});if(r.success){toast('Usuário desbanido','success');loadUsers()}else toast(r.error||'Erro','error')}
+async function resetHwid(i){if(!confirm('Resetar HWID do usuário '+i+'?'))return;const r=await api('POST','/api/admin/users/reset_hwid',{user_id:i});if(r.success){toast('HWID resetado','success');loadUsers()}else toast(r.error||'Erro','error')}
+async function loadLogs(){const r=await api('POST','/api/admin/logs');if(!r.success)return;const c=document.getElementById('logs-container');c.innerHTML='<table><thead><tr><th>ID</th><th>Ação</th><th>Usuário</th><th>Detalhes</th><th>IP</th><th>Data</th></tr></thead><tbody>'+(r.logs||[]).map(x=>`<tr><td>${x.id}</td><td>${x.action}</td><td>${x.username}</td><td>${x.details||'-'}</td><td>${x.ip||'-'}</td><td>${x.created_at||'-'}</td></tr>`).join('')+'</tbody></table>'}
+async function sendAnnounce(){const m=document.getElementById('announce-msg').value.trim();if(!m)return toast('Digite uma mensagem','error');const r=await api('POST','/api/admin/announce',{message:m,type:document.getElementById('announce-type').value});if(r.success){toast('Anúncio enviado','success');document.getElementById('announce-msg').value=''}else toast(r.error||'Erro','error')}
+async function loadConfig(){const r=await api('POST','/api/admin/config');if(!r.success)return;document.getElementById('config-display').innerHTML='<pre style="background:#12121f;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px;color:#ccc">'+JSON.stringify(r.config||r,null,2)+'</pre>'}
+loadDashboard()
+</script>
+</body>
+</html>
