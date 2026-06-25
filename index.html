@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Satella - Painel</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--surface:#141414;--surface2:#1e1e1e;--border:#2a2a2a;--text:#e8e8e8;--muted:#8a8a8a;--accent:#cccccc;--accent2:#aaaaaa;--red:#999999;--green:#999999;--yellow:#bbbbbb;--blue:#aaaaaa;--radius:12px;--radius-lg:20px}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(200,200,200,.25);border-radius:3px;transition:background .2s}
+::-webkit-scrollbar-thumb:hover{background:rgba(200,200,200,.45)}
+::-webkit-scrollbar-corner{background:transparent}
+*{scrollbar-width:thin;scrollbar-color:rgba(200,200,200,.25) transparent}
+
+#particles{position:fixed;inset:0;pointer-events:none;z-index:0}
+.glow{display:none}
+
+.toast{position:fixed;top:20px;right:20px;padding:14px 24px;border-radius:var(--radius);font-size:.9rem;font-weight:500;z-index:9999;opacity:0;transform:translateY(-20px);transition:all .35s cubic-bezier(.34,1.56,.64,1);max-width:420px;backdrop-filter:blur(16px);pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.toast.success{background:rgba(255,255,255,.1);color:#ccc;border:1px solid rgba(255,255,255,.2)}
+.toast.error{background:rgba(255,255,255,.05);color:#aaa;border:1px solid rgba(255,255,255,.15)}
+.toast.info{background:rgba(200,200,200,.1);color:#ccc;border:1px solid rgba(200,200,200,.2)}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideRight{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:translateX(0)}}
+@keyframes popIn{0%{opacity:0;transform:scale(.85)}50%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes countUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Login */
+.login-page{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;position:relative;z-index:1}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:48px 40px;width:100%;max-width:400px;animation:fadeIn .6s;box-shadow:0 25px 80px rgba(0,0,0,.6);position:relative;overflow:hidden}
+.login-card::before{content:'';position:absolute;inset:-2px;background:linear-gradient(45deg,transparent,rgba(255,255,255,.3),transparent,rgba(200,200,200,.3),transparent);background-size:400% 400%;opacity:0;z-index:-1;border-radius:22px;animation:shimmer 5s linear infinite;transition:opacity .3s}
+.login-card:hover::before{opacity:.2}
+.login-logo{font-size:1.6rem;font-weight:800;text-align:center;margin-bottom:2px;letter-spacing:1px}
+.login-logo span{color:#fff}
+.login-sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:28px}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:6px;font-weight:500}
+.form-group input{width:100%;padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.9rem;outline:none;transition:all .25s}
+.form-group input:focus{border-color:#888;box-shadow:0 0 0 3px rgba(200,200,200,.12)}
+.btn{padding:12px 20px;border:none;border-radius:8px;font-weight:600;font-size:.9rem;cursor:pointer;transition:all .25s cubic-bezier(.34,1.56,.64,1);position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent,rgba(255,255,255,.08),transparent);transform:translateX(-100%);transition:transform .5s}
+.btn:hover::after{transform:translateX(100%)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,#666,#444);color:#fff;width:100%}
+.btn-primary:hover{box-shadow:0 4px 24px rgba(200,200,200,.2)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-danger{background:#555;color:#fff;width:auto}
+.btn-danger:hover{box-shadow:0 4px 20px rgba(200,200,200,.15)}
+.btn-success{background:#666;color:#fff;width:auto}
+.btn-success:hover{box-shadow:0 4px 20px rgba(200,200,200,.15)}
+.btn-yellow{background:#777;color:#fff;width:auto}
+.btn-yellow:hover{box-shadow:0 4px 20px rgba(200,200,200,.15)}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border);width:auto}
+.btn-outline:hover{background:var(--surface2);border-color:#888}
+.btn-sm{padding:8px 14px;width:auto;font-size:.8rem}
+.login-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red);padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:16px;display:none;animation:popIn .3s}
+
+/* Dashboard */
+.dashboard{display:none;min-height:100vh;animation:fadeIn .4s}
+.dash-nav{background:rgba(17,17,24,.85);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(16px)}
+.dash-nav .logo{font-weight:800;font-size:1.1rem;display:flex;align-items:center;gap:8px}
+.dash-nav .logo .badge{padding:2px 10px;border-radius:20px;background:#555;font-size:.65rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.5px}
+.dash-nav .logo span{color:#fff}
+.dash-nav .right{display:flex;align-items:center;gap:16px}
+.dash-nav .right span{font-size:.85rem;color:var(--muted)}
+.dash-body{display:flex;flex-direction:column}
+.dash-sidebar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;gap:0;overflow-x:auto}
+.dash-sidebar a{display:flex;align-items:center;gap:8px;padding:14px 20px;color:var(--muted);text-decoration:none;font-size:.85rem;transition:all .2s;cursor:pointer;border:none;background:none;font-family:inherit;position:relative;border-bottom:3px solid transparent;white-space:nowrap}
+.dash-sidebar a:hover{color:var(--text);background:rgba(200,200,200,.06)}
+.dash-sidebar a.active{color:#fff;border-bottom-color:#fff}
+.dash-sidebar .icon{font-size:1rem;width:18px;text-align:center}
+.dash-content{flex:1;padding:28px 32px;overflow-y:auto;max-height:calc(100vh - 108px)}
+.dash-content .page-title{font-size:1.3rem;font-weight:700;margin-bottom:2px}
+.dash-content .page-sub{color:var(--muted);font-size:.8rem;margin-bottom:24px}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:all .3s cubic-bezier(.34,1.56,.64,1);animation:fadeIn .5s both;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;border-radius:50%;opacity:.06;transform:translate(20px,-20px)}
+.stat-card:hover{transform:translateY(-3px);border-color:#888;box-shadow:0 8px 30px rgba(200,200,200,.1)}
+.stat-card .stat-icon{font-size:1.5rem;margin-bottom:6px}
+.stat-card .stat-value{font-size:1.7rem;font-weight:800;color:#fff}
+.stat-card .stat-label{font-size:.75rem;color:var(--muted);margin-top:2px}
+
+/* Tables */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:auto;animation:fadeIn .4s}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 14px;text-align:left;font-size:.82rem}
+th{background:var(--bg);color:var(--muted);font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px;position:sticky;top:0;z-index:1}
+td{border-bottom:1px solid var(--border)}
+tr:hover td{background:rgba(200,200,200,.03)}
+tr:last-child td{border-bottom:none}
+.tag{padding:2px 10px;border-radius:20px;font-size:.68rem;font-weight:600;display:inline-block}
+.tag-green{background:rgba(200,200,200,.12);color:#ccc}
+.tag-red{background:rgba(200,200,200,.12);color:#ccc}
+.tag-yellow{background:rgba(200,200,200,.12);color:#ccc}
+.tag-purple{background:rgba(200,200,200,.12);color:#ccc}
+.tag-cyan{background:rgba(200,200,200,.12);color:#ccc}
+.tag-muted{background:rgba(200,200,200,.08);color:#888}
+
+/* Panels */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;animation:fadeIn .3s}
+.panel h3{font-size:1rem;font-weight:600;margin-bottom:12px}
+.panel-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.panel-row input{padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;outline:none;transition:all .2s;font-family:monospace}
+.panel-row input:focus{border-color:#888;box-shadow:0 0 0 2px rgba(200,200,200,.1)}
+.panel-row input[type=number]{width:70px;text-align:center}
+.panel-row input[type=text]{min-width:180px}
+.panel-row .sep{color:var(--muted);font-size:.8rem}
+.key-display{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:.85rem;word-break:break-all;margin-top:10px;display:none;animation:popIn .35s;max-height:200px;overflow-y:auto}
+.key-display.show{display:block}
+
+.search-bar{display:flex;gap:10px;margin-bottom:12px;align-items:center}
+.search-bar input{padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.85rem;outline:none;flex:1;max-width:280px;transition:all .2s}
+.search-bar input:focus{border-color:#888;box-shadow:0 0 0 2px rgba(200,200,200,.1)}
+.search-bar .count-info{font-size:.8rem;color:var(--muted);margin-left:auto}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(6px);z-index:200;align-items:center;justify-content:center;animation:fadeIn .15s}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px 32px;width:100%;max-width:400px;animation:popIn .3s;box-shadow:0 25px 60px rgba(0,0,0,.5)}
+.modal h3{font-size:1.1rem;margin-bottom:4px}
+.modal .modal-desc{color:var(--muted);font-size:.82rem;margin-bottom:16px}
+.modal .form-group{margin-bottom:14px}
+.modal .modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal .modal-actions .btn{flex:1}
+
+/* Section */
+.section{display:none;animation:fadeIn .35s}
+.section.active{display:block}
+
+/* Empty state */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:.9rem}
+.empty-state .empty-icon{font-size:2.5rem;margin-bottom:10px;opacity:.3}
+
+/* Responsive */
+@media(max-width:768px){
+  .dash-sidebar{padding:0 8px}
+  .dash-sidebar a{padding:12px 14px;font-size:.82rem}
+  .dash-content{padding:16px}
+  .login-card{padding:32px 20px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .panel-row{flex-direction:column;align-items:stretch}
+  .panel-row input[type=text]{min-width:unset;width:100%}
+  .panel-row input[type=number]{width:100%}
+}
+</style>
+</head>
+<body>
+<div id="particles"></div>
+<div class="glow"></div>
+<div id="toast" class="toast"></div>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-page">
+  <div class="login-card">
+    <div class="login-logo"><span>//</span> satella</div>
+    <div class="login-sub">Painel Administrativo</div>
+    <div id="loginError" class="login-error"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>Usuario</label>
+        <input type="text" id="loginUser" placeholder="usuario" autocomplete="off" required>
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="loginPass" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
+    </form>
+    <div style="text-align:center;margin-top:16px;font-size:.72rem;color:var(--muted)">acesso restrito</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="dashboard">
+  <nav class="dash-nav">
+    <div class="logo"><span>//</span> satella <span class="badge">admin</span></div>
+    <div class="right">
+      <span id="dashUser"></span>
+      <button class="btn btn-sm btn-danger" onclick="logout()">Sair</button>
+    </div>
+  </nav>
+  <div class="dash-body">
+    <div class="dash-sidebar">
+      <a class="active" onclick="showSection('home')"><span class="icon">&#9670;</span> Inicio</a>
+      <a onclick="showSection('keys')"><span class="icon">&#9881;</span> Licencas</a>
+      <a onclick="showSection('users')"><span class="icon">&#9783;</span> Usuarios</a>
+      <a onclick="showSection('logs')"><span class="icon">&#9776;</span> Logs</a>
+      <a onclick="showSection('settings')"><span class="icon">&#9881;</span> Config</a>
+    </div>
+    <div class="dash-content">
+
+      <!-- HOME -->
+      <div id="sectionHome" class="section active">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub">Visao geral do sistema</div>
+        <div class="stats">
+          <div class="stat-card"><div class="stat-icon">&#128273;</div><div class="stat-value" id="statKeysTotal">0</div><div class="stat-label">Keys Geradas</div></div>
+          <div class="stat-card"><div class="stat-icon">&#9989;</div><div class="stat-value" id="statKeysAvail">0</div><div class="stat-label">Keys Disponiveis</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128200;</div><div class="stat-value" id="statKeysUsed">0</div><div class="stat-label">Keys Usadas</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128101;</div><div class="stat-value" id="statUsersTotal">0</div><div class="stat-label">Total Usuarios</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128170;</div><div class="stat-value" id="statUsersActive">0</div><div class="stat-label">Usuarios Ativos</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128683;</div><div class="stat-value" id="statUsersBanned">0</div><div class="stat-label">Banidos</div></div>
+        </div>
+      </div>
+
+      <!-- KEYS -->
+      <div id="sectionKeys" class="section">
+        <div class="page-title">Licencas</div>
+        <div class="page-sub">Gerenciar keys de ativacao</div>
+
+        <div class="panel">
+          <h3>Gerar Keys</h3>
+          <div class="panel-row">
+            <input type="number" id="keyCount" value="1" min="1" max="50">
+            <span class="sep">x</span>
+            <input type="number" id="keyDays" value="30" min="0" max="3650" style="width:70px">
+            <span class="sep">dias (0 = ilimitado)</span>
+            <button class="btn btn-sm btn-primary" onclick="genKeys()" id="genKeysBtn">Gerar</button>
+          </div>
+          <div id="keyDisplay" class="key-display"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Adicionar Key Manual</h3>
+          <div class="panel-row">
+            <input type="text" id="keyManual" placeholder="XXXXX-XXXXX-XXXXX" style="min-width:200px;font-family:monospace">
+            <span class="sep">dias:</span>
+            <input type="number" id="keyManualDays" value="30" min="0" max="3650" style="width:65px">
+            <button class="btn btn-sm btn-outline" onclick="addKey()">Adicionar</button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="keySearch" placeholder="Buscar key..." oninput="renderKeys()">
+          <span class="count-info" id="keyCountInfo"></span>
+          <button class="btn btn-sm btn-outline" onclick="renderKeys()">Atualizar</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Key</th><th>Status</th><th>Duracao</th><th>Criada em</th><th>Acoes</th></tr></thead>
+            <tbody id="keysTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div id="sectionUsers" class="section">
+        <div class="page-title">Usuarios</div>
+        <div class="page-sub">Gerenciar contas registradas</div>
+
+        <div class="search-bar">
+          <input type="text" id="userSearch" placeholder="Buscar usuario..." oninput="renderUsers()">
+          <span class="count-info" id="userCountInfo"></span>
+          <button class="btn btn-sm btn-outline" onclick="renderUsers()">Atualizar</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuario</th><th>Status</th><th>HWID</th><th>Expira em</th><th>Acoes</th></tr></thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- LOGS -->
+      <div id="sectionLogs" class="section">
+        <div class="page-title">Auditoria</div>
+        <div class="page-sub">Registro de atividades do sistema</div>
+
+        <div class="search-bar">
+          <input type="text" id="logSearch" placeholder="Buscar nos logs..." oninput="renderLogs()">
+          <span class="count-info" id="logCountInfo"></span>
+          <button class="btn btn-sm btn-outline" onclick="renderLogs()">Atualizar</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data/Hora</th><th>Acao</th><th>Usuario</th><th>Detalhe</th><th>IP</th></tr></thead>
+            <tbody id="logsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="sectionSettings" class="section">
+        <div class="page-title">Configuracoes</div>
+        <div class="page-sub">Gerenciar configuracoes do sistema</div>
+
+        <div class="panel">
+          <h3>Chave PIX</h3>
+          <div class="panel-row">
+            <input type="text" id="pixKey" placeholder="Chave PIX" style="flex:1">
+          </div>
+          <div class="panel-row" style="margin-top:8px">
+            <span class="sep">Valor padrao: R$</span>
+            <input type="text" id="pixValue" value="25.00" style="width:80px">
+            <button class="btn btn-sm btn-primary" onclick="savePixConfig()">Salvar PIX</button>
+            <span id="pixSaveMsg" style="color:var(--green);font-size:.8rem;display:none">Salvo!</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Webhook / Anuncio</h3>
+          <div class="panel-row">
+            <input type="text" id="webhookUrl" placeholder="URL do webhook" style="flex:1">
+            <button class="btn btn-sm btn-outline" onclick="saveWebhook()">Salvar Webhook</button>
+          </div>
+          <div class="panel-row" style="margin-top:10px">
+            <input type="text" id="announceMsg" placeholder="Mensagem do anuncio..." style="flex:1">
+            <button class="btn btn-sm btn-yellow" onclick="sendAnnounce()">Anunciar</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Pricing</h3>
+          <div style="font-size:.85rem;color:var(--muted);line-height:1.8">
+            <div>Semanal: <strong style="color:var(--text)">R$50</strong> (7 dias)</div>
+            <div>Mensal: <strong style="color:var(--text)">R$100</strong> (30 dias)</div>
+            <div>Lifetime: <strong style="color:var(--text)">R$350</strong> (36500 dias)</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Sistema</h3>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.8">
+            <div>Painel: <strong style="color:var(--text)">satella-auth-bot.onrender.com</strong></div>
+            <div>Banco: <strong style="color:var(--text)" id="dbTypeLabel">SQLite</strong></div>
+            <div id="dbStatRow">Keys no banco: <strong style="color:var(--text)" id="dbTotalKeys">0</strong></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD TIME -->
+<div id="timeModal" class="modal-overlay">
+  <div class="modal">
+    <h3>Adicionar Tempo</h3>
+    <p class="modal-desc">Key: <strong id="modalKeyVal" style="color:#ccc;font-family:monospace"></strong></p>
+    <div class="form-group">
+      <label>Dias para adicionar</label>
+      <input type="number" id="modalDays" value="30" min="1" max="3650">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmAddTime()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){var p=document.getElementById('particles');for(var i=0;i<35;i++){var e=document.createElement('div');e.style.cssText='position:absolute;width:'+(1+Math.random()*3)+'px;height:'+(1+Math.random()*3)+'px;background:'+['#ffffff','#cccccc','#999999','#666666'][Math.floor(Math.random()*4)]+';border-radius:50%;opacity:0;left:'+Math.random()*100+'%;animation:floatUp linear infinite;animation-duration:'+(12+Math.random()*20)+'s;animation-delay:'+Math.random()*20+'s';p.appendChild(e)}
+var s=document.createElement('style');s.textContent='@keyframes floatUp{0%{opacity:0;transform:translateY(100vh) scale(0)}10%{opacity:.5}90%{opacity:.5}100%{opacity:0;transform:translateY(-10vh) scale(1)}}';document.head.appendChild(s)})();
+
+const API='';
+var token=null,admin=null,curSection='home',modalKey=null,keysCache=[],usersCache=[],logsCache=[];
+
+function toast(m,t){var e=document.getElementById('toast');e.textContent=m;e.className='toast '+t+' show';clearTimeout(e._t);e._t=setTimeout(function(){e.classList.remove('show')},3500)}
+
+function api(p,d){var h={'Content-Type':'application/json'};if(token)h['Authorization']='Bearer '+token;return fetch(API+p,{method:'POST',headers:h,body:JSON.stringify(d||{})}).then(function(r){return r.json()}).then(function(r){if(!r.success&&r.error==='N\u00e3o autorizado'){logout();toast('Sess\u00e3o expirada, fa\u00e7a login novamente','error')}return r}).catch(function(){return{success:false,error:'Erro de conexao'}})}
+
+function showSection(n){
+  curSection=n;
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active')});
+  document.getElementById('section'+n.charAt(0).toUpperCase()+n.slice(1)).classList.add('active');
+  document.querySelectorAll('.dash-sidebar a').forEach(function(a){a.classList.remove('active')});
+  document.querySelector('.dash-sidebar a[onclick*="'+n+'"]').classList.add('active');
+  if(n==='home')refreshStats();
+  else if(n==='keys')renderKeys();
+  else if(n==='users')renderUsers();
+  else if(n==='logs')renderLogs();
+  else if(n==='settings')loadConfig();
+}
+
+function logout(){
+  token=null;admin=null;
+  sessionStorage.removeItem('stok');sessionStorage.removeItem('sadm');
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('loginPage').style.display='flex'
+}
+
+function fmtDate(ts){return ts?new Date(ts*1e3).toLocaleString('pt-BR'):'---'}
+
+// --- LOGIN ---
+document.getElementById('loginForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var u=document.getElementById('loginUser').value.trim().toLowerCase();
+  var p=document.getElementById('loginPass').value;
+  var btn=document.getElementById('loginBtn');
+  var err=document.getElementById('loginError');
+  err.style.display='none';btn.disabled=true;btn.textContent='Entrando...';
+  api('/api/admin/login',{username:u,password:p}).then(function(r){
+    if(r.success){
+      token=r.token;admin=r.username;
+      sessionStorage.setItem('stok',r.token);sessionStorage.setItem('sadm',r.username);
+      document.getElementById('loginPage').style.display='none';
+      document.getElementById('dashboard').style.display='flex';
+      document.getElementById('dashUser').textContent=r.username;
+      showSection('home');toast('Bem-vindo, '+r.username,'success')
+    }else{
+      err.textContent=r.error||'Credenciais invalidas';err.style.display='block';
+      document.getElementById('loginPass').value='';document.getElementById('loginPass').focus()
+    }
+    btn.disabled=false;btn.textContent='Entrar'
+  })
+});
+
+// --- AUTO LOGIN ---
+(function(){
+  var st=sessionStorage.getItem('stok'),su=sessionStorage.getItem('sadm');
+  if(st&&su){
+    token=st;admin=su;
+    api('/api/admin/stats').then(function(r){
+      if(r.success){
+        document.getElementById('loginPage').style.display='none';
+        document.getElementById('dashboard').style.display='flex';
+        document.getElementById('dashUser').textContent=admin;
+        showSection('home')
+      }else{
+        sessionStorage.removeItem('stok');sessionStorage.removeItem('sadm')
+      }
+    })
+  }
+})();
+
+// --- STATS ---
+function refreshStats(){
+  api('/api/admin/stats').then(function(r){
+    if(r.success){
+      setNum('statKeysTotal',r.total_keys);
+      setNum('statKeysAvail',r.avail_keys);
+      setNum('statKeysUsed',r.used_keys);
+      setNum('statUsersTotal',r.total_users);
+      setNum('statUsersActive',r.active_users);
+      setNum('statUsersBanned',r.banned_users);
+      var dbLabel=document.getElementById('dbTypeLabel');
+      if(dbLabel)dbLabel.textContent=r.avail_keys!==undefined?'SQLite /w Render':'SQLite';
+      var tot=document.getElementById('dbTotalKeys');
+      if(tot)tot.textContent=r.total_keys
+    }
+  })
+}
+
+function setNum(id,v){
+  var el=document.getElementById(id);if(!el)return;
+  var cur=parseInt(el.textContent)||0;if(cur===v){el.textContent=v;return}
+  el.textContent=v
+}
+
+// --- KEYS ---
+function genKeys(){
+  var n=parseInt(document.getElementById('keyCount').value)||1;
+  var d=parseInt(document.getElementById('keyDays').value)||30;
+  var btn=document.getElementById('genKeysBtn');
+  btn.disabled=true;btn.textContent='Gerando...';
+  api('/api/admin/keys/generate',{quantity:n,days:d}).then(function(r){
+    btn.disabled=false;btn.textContent='Gerar';
+    if(!r.success){toast('Erro: '+(r.error||'desconhecido'),'error');return}
+    var el=document.getElementById('keyDisplay');
+    el.innerHTML=r.keys.map(function(k){return k+' ('+d+' dias)'}).join('<br>');
+    el.classList.add('show');
+    setTimeout(function(){el.classList.remove('show')},5000);
+    toast(r.quantity+' key(s) geradas!','success');
+    renderKeys()
+  })
+}
+
+function addKey(){
+  var val=document.getElementById('keyManual').value.trim().toUpperCase();
+  var d=parseInt(document.getElementById('keyManualDays').value)||30;
+  if(!val||val.length<5){toast('Key invalida','error');return}
+  api('/api/admin/keys/add',{key:val,days:d}).then(function(r){
+    if(!r.success){toast('Erro: '+(r.error||'desconhecido'),'error');return}
+    document.getElementById('keyManual').value='';
+    toast('Key adicionada!','success');
+    renderKeys()
+  })
+}
+
+function delKey(k){
+  if(!confirm('Deletar key '+k+'?'))return;
+  api('/api/admin/keys/delete_by_value',{key:k}).then(function(r){
+    if(!r.success){toast('Erro','error');return}
+    toast('Key deletada','success');
+    renderKeys()
+  })
+}
+
+function openTimeModal(k){
+  modalKey=k;
+  document.getElementById('modalKeyVal').textContent=k;
+  document.getElementById('modalDays').value=30;
+  document.getElementById('timeModal').classList.add('show')
+}
+function closeModal(){
+  document.getElementById('timeModal').classList.remove('show');modalKey=null
+}
+
+function confirmAddTime(){
+  var d=parseInt(document.getElementById('modalDays').value);
+  if(!d||d<1){toast('Dias invalidos','error');return}
+  api('/api/admin/keys/addtime',{key:modalKey,days:d}).then(function(r){
+    if(!r.success){toast('Erro:'+(r.error||''),'error');return}
+    toast(r.message||d+' dia(s) adicionados!','success');
+    closeModal();renderKeys()
+  })
+}
+
+function renderKeys(){
+  var q=document.getElementById('keySearch').value.trim().toUpperCase();
+  api('/api/admin/keys').then(function(r){
+    var tbody=document.getElementById('keysTable');
+    keysCache=r.keys||[];
+    if(!r.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state">Erro ao carregar keys</div></td></tr>';return}
+    var filtered=keysCache.filter(function(k){return!q||k.key.toUpperCase().includes(q)||(k.used_by&&k.used_by.toUpperCase().includes(q))});
+    document.getElementById('keyCountInfo').textContent=filtered.length+'/'+keysCache.length;
+    if(!filtered.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">&#128270;</div>Nenhuma key encontrada</div></td></tr>';return}
+    tbody.innerHTML='';
+    filtered.forEach(function(k,i){
+      var tr=document.createElement('tr');
+      tr.style.animation='fadeIn .3s '+(i*0.02)+'s both';
+      var statHtml=k.used_by?'<span class="tag tag-yellow">Em uso</span>':'<span class="tag tag-green">Disponivel</span>';
+      var dur=k.used_by?k.duration_days+' dias':'---';
+      var created=k.created_at?new Date(k.created_at*1e3).toLocaleDateString('pt-BR'):'---';
+      var act='';
+      if(!k.used_by)act+='<button class="btn btn-sm btn-danger" onclick="delKey(\''+k.key+'\')" style="padding:3px 10px;font-size:.72rem">Deletar</button>';
+      else act+='<button class="btn btn-sm btn-yellow" onclick="openTimeModal(\''+k.key+'\')" style="padding:3px 10px;font-size:.72rem">+Tempo</button>';
+      tr.innerHTML='<td style="font-family:monospace;font-size:.82rem">'+k.key+'</td><td>'+statHtml+'</td><td style="font-size:.82rem">'+dur+'</td><td style="color:var(--muted)">'+created+'</td><td><div style="display:flex;gap:4px">'+act+'</div></td>';
+      tbody.appendChild(tr)
+    })
+  })
+}
+
+// --- USERS ---
+function banUser(u){
+  api('/api/admin/users/ban',{username:u}).then(function(r){
+    if(!r.success){toast('Erro','error');return}
+    toast('Usuario banido','success');renderUsers()
+  })
+}
+function unbanUser(u){
+  api('/api/admin/users/unban',{username:u}).then(function(r){
+    if(!r.success){toast('Erro','error');return}
+    toast('Usuario desbanido','success');renderUsers()
+  })
+}
+function resetHwid(u){
+  api('/api/admin/users/reset_hwid',{username:u}).then(function(r){
+    if(!r.success){toast('Erro','error');return}
+    toast('HWID resetado','success');renderUsers()
+  })
+}
+
+function renderUsers(){
+  var q=document.getElementById('userSearch').value.trim().toLowerCase();
+  api('/api/admin/users').then(function(r){
+    var tbody=document.getElementById('usersTable');
+    usersCache=r.users||[];
+    if(!r.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state">Erro ao carregar usuarios</div></td></tr>';return}
+    var filtered=usersCache.filter(function(u){return!q||u.username.toLowerCase().includes(q)});
+    document.getElementById('userCountInfo').textContent=filtered.length+'/'+usersCache.length;
+    if(!filtered.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">&#128465;</div>Nenhum usuario encontrado</div></td></tr>';return}
+    tbody.innerHTML='';
+    filtered.forEach(function(u,i){
+      var tr=document.createElement('tr');
+      tr.style.animation='fadeIn .3s '+(i*0.02)+'s both';
+      var stat=u.banned?'<span class="tag tag-red">Banido</span>':(u.expired?'<span class="tag tag-red">Expirado</span>':'<span class="tag tag-green">Ativo</span>');
+      var hwid=u.hwid?u.hwid.substring(0,12)+'...':'---';
+      var exp=u.expires_at?new Date(u.expires_at*1e3).toLocaleDateString('pt-BR'):'---';
+      var act='';
+      if(u.banned)act+='<button class="btn btn-sm btn-success" onclick="unbanUser(\''+u.username+'\')" style="padding:3px 10px;font-size:.72rem">Desbanir</button>';
+      else act+='<button class="btn btn-sm btn-danger" onclick="banUser(\''+u.username+'\')" style="padding:3px 10px;font-size:.72rem">Banir</button>';
+      if(u.hwid)act+='<button class="btn btn-sm btn-outline" onclick="resetHwid(\''+u.username+'\')" style="padding:3px 10px;font-size:.72rem">Reset HWID</button>';
+      tr.innerHTML='<td>'+u.username+'</td><td>'+stat+'</td><td style="color:var(--muted)">'+hwid+'</td><td style="color:var(--muted)">'+exp+'</td><td><div style="display:flex;gap:4px">'+act+'</div></td>';
+      tbody.appendChild(tr)
+    })
+  })
+}
+
+// --- LOGS ---
+function renderLogs(){
+  var q=document.getElementById('logSearch').value.trim().toLowerCase();
+  api('/api/admin/logs').then(function(r){
+    var tbody=document.getElementById('logsTable');
+    logsCache=r.logs||[];
+    if(!r.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state">Erro ao carregar logs</div></td></tr>';return}
+    var filtered=logsCache.filter(function(l){return!q||l.action.toLowerCase().includes(q)||l.username.toLowerCase().includes(q)||l.detail.toLowerCase().includes(q)});
+    document.getElementById('logCountInfo').textContent=filtered.length+'/'+logsCache.length;
+    if(!filtered.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">&#128196;</div>Nenhum log encontrado</div></td></tr>';return}
+    tbody.innerHTML='';
+    filtered.forEach(function(l,i){
+      var tr=document.createElement('tr');
+      tr.style.animation='fadeIn .2s '+(i*0.01)+'s both';
+      var ts=l.timestamp?new Date(l.timestamp*1e3).toLocaleString('pt-BR'):'---';
+      var actLabel=l.action||'---';
+      var actColors={admin_genkey:'tag-purple',admin_addkey:'tag-purple',admin_delkey:'tag-red',admin_delkey_val:'tag-red',admin_addtime:'tag-yellow',admin_ban:'tag-red',admin_unban:'tag-green',admin_reset_hwid:'tag-cyan',login_ok:'tag-green',login_fail:'tag-red',login_banned:'tag-red',login_expired:'tag-yellow',register_ok:'tag-cyan',register_badkey:'tag-red',download:'tag-muted',announce:'tag-yellow'};
+      var cls=actColors[l.action]||'tag-muted';
+      tr.innerHTML='<td style="font-size:.75rem;color:var(--muted)">'+ts+'</td><td><span class="tag '+cls+'">'+actLabel+'</span></td><td>'+l.username+'</td><td style="font-size:.78rem;color:var(--muted)">'+(l.detail||'')+'</td><td style="font-size:.72rem;color:var(--muted)">'+(l.ip||'')+'</td>';
+      tbody.appendChild(tr)
+    })
+  })
+}
+
+// --- SETTINGS ---
+function loadConfig(){
+  api('/api/admin/config',{action:'get'}).then(function(r){
+    if(r.success&&r.config){
+      document.getElementById('pixKey').value=r.config.pix_key||'';
+      document.getElementById('pixValue').value=r.config.pix_value||'25.00'
+    }
+  })
+}
+
+function savePixConfig(){
+  var pk=document.getElementById('pixKey').value.trim();
+  var pv=document.getElementById('pixValue').value.trim();
+  api('/api/admin/config',{action:'set',pix_key:pk,pix_value:pv}).then(function(r){
+    var msg=document.getElementById('pixSaveMsg');
+    if(r.success){msg.style.display='inline';toast('PIX salvo!','success');setTimeout(function(){msg.style.display='none'},3000)}
+    else toast('Erro','error')
+  })
+}
+
+function saveWebhook(){
+  var w=document.getElementById('webhookUrl').value.trim();
+  api('/api/admin/config',{action:'set',webhook_url:w}).then(function(r){
+    if(r.success)toast('Webhook salvo!','success')
+    else toast('Erro','error')
+  })
+}
+
+function sendAnnounce(){
+  var m=document.getElementById('announceMsg').value.trim();
+  if(!m){toast('Digite uma mensagem','error');return}
+  api('/api/admin/announce',{message:m}).then(function(r){
+    if(r.success){toast('Anuncio enviado!','success');document.getElementById('announceMsg').value=''}
+    else toast('Erro','error')
+  })
+}
+
+// Auto refresh
+setInterval(function(){
+  if(document.getElementById('dashboard').style.display==='flex'){
+    if(curSection==='home')refreshStats();
+    else if(curSection==='keys')renderKeys();
+    else if(curSection==='users')renderUsers()
+  }
+},30000)
+</script>
+</body>
+</html>
