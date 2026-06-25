@@ -194,6 +194,7 @@ tr:last-child td{border-bottom:none}
       <a onclick="showSection('keys')"><span class="icon">&#9881;</span> Licencas</a>
       <a onclick="showSection('users')"><span class="icon">&#9783;</span> Usuarios</a>
       <a onclick="showSection('logs')"><span class="icon">&#9776;</span> Logs</a>
+      <a onclick="showSection('private')"><span class="icon">&#9672;</span> Private</a>
       <a onclick="showSection('settings')"><span class="icon">&#9881;</span> Config</a>
     </div>
     <div class="dash-content">
@@ -291,6 +292,52 @@ tr:last-child td{border-bottom:none}
         </div>
       </div>
 
+      <!-- PRIVATE -->
+      <div id="sectionPrivate" class="section">
+        <div class="page-title">Private</div>
+        <div class="page-sub">Gerenciar o cheat privado</div>
+        <div class="stats">
+          <div class="stat-card"><div class="stat-icon">&#9672;</div><div class="stat-value" id="statPvtKeys">0</div><div class="stat-label">Keys Privadas</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128101;</div><div class="stat-value" id="statPvtUsers">0</div><div class="stat-label">Usuarios Private</div></div>
+          <div class="stat-card"><div class="stat-icon">&#128737;</div><div class="stat-value" id="statPvtActive">0</div><div class="stat-label">Ativos</div></div>
+        </div>
+
+        <div class="panel">
+          <h3>Gerar Key Private</h3>
+          <div class="panel-row">
+            <input type="number" id="pvtKeyCount" value="1" min="1" max="50">
+            <span class="sep">x</span>
+            <input type="number" id="pvtKeyDays" value="30" min="0" max="3650" style="width:70px">
+            <span class="sep">dias</span>
+            <button class="btn btn-sm btn-primary" onclick="genPvtKeys()">Gerar</button>
+          </div>
+          <div id="pvtKeyDisplay" class="key-display"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Adicionar Key Manual</h3>
+          <div class="panel-row">
+            <input type="text" id="pvtKeyManual" placeholder="XXXXX-XXXXX-XXXXX" style="min-width:200px;font-family:monospace">
+            <span class="sep">dias:</span>
+            <input type="number" id="pvtKeyManualDays" value="30" min="0" max="3650" style="width:65px">
+            <button class="btn btn-sm btn-outline" onclick="addPvtKey()">Adicionar</button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="pvtKeySearch" placeholder="Buscar key private..." oninput="renderPvtKeys()">
+          <span class="count-info" id="pvtKeyCountInfo"></span>
+          <button class="btn btn-sm btn-outline" onclick="renderPvtKeys()">Atualizar</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Key</th><th>Status</th><th>Duracao</th><th>Criada em</th><th>Acoes</th></tr></thead>
+            <tbody id="pvtKeysTable"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- SETTINGS -->
       <div id="sectionSettings" class="section">
         <div class="page-title">Configuracoes</div>
@@ -381,6 +428,7 @@ function showSection(n){
   else if(n==='keys')renderKeys();
   else if(n==='users')renderUsers();
   else if(n==='logs')renderLogs();
+  else if(n==='private')renderPvtKeys();
   else if(n==='settings')loadConfig();
 }
 
@@ -540,6 +588,70 @@ function renderKeys(){
       tr.innerHTML='<td style="font-family:monospace;font-size:.82rem">'+k.key+'</td><td>'+statHtml+'</td><td style="font-size:.82rem">'+dur+'</td><td style="color:var(--muted)">'+created+'</td><td><div style="display:flex;gap:4px">'+act+'</div></td>';
       tbody.appendChild(tr)
     })
+  })
+}
+
+// --- PRIVATE ---
+function genPvtKeys(){
+  var n=parseInt(document.getElementById('pvtKeyCount').value)||1;
+  var d=parseInt(document.getElementById('pvtKeyDays').value)||30;
+  var btn=document.getElementById('genPvtKeysBtn');
+  if(btn)btn.disabled=true;if(btn)btn.textContent='Gerando...';
+  api('/api/admin/keys/generate',{quantity:n,days:d,product:'private'}).then(function(r){
+    if(btn)btn.disabled=false;if(btn)btn.textContent='Gerar';
+    if(!r.success){toast('Erro: '+(r.error||'desconhecido'),'error');return}
+    var el=document.getElementById('pvtKeyDisplay');
+    el.innerHTML=r.keys.map(function(k){return k+' ('+d+' dias)'}).join('<br>');
+    el.classList.add('show');
+    setTimeout(function(){el.classList.remove('show')},5000);
+    toast(r.quantity+' key(s) private geradas!','success');
+    renderPvtKeys()
+  })
+}
+
+function addPvtKey(){
+  var val=document.getElementById('pvtKeyManual').value.trim().toUpperCase();
+  var d=parseInt(document.getElementById('pvtKeyManualDays').value)||30;
+  if(!val||val.length<5){toast('Key invalida','error');return}
+  api('/api/admin/keys/add',{key:val,days:d,product:'private'}).then(function(r){
+    if(!r.success){toast('Erro: '+(r.error||'desconhecido'),'error');return}
+    document.getElementById('pvtKeyManual').value='';
+    toast('Key private adicionada!','success');
+    renderPvtKeys()
+  })
+}
+
+function delPvtKey(k){
+  if(!confirm('Deletar key private '+k+'?'))return;
+  api('/api/admin/keys/delete_by_value',{key:k,product:'private'}).then(function(r){
+    if(!r.success){toast('Erro','error');return}
+    toast('Key private deletada','success');
+    renderPvtKeys()
+  })
+}
+
+function renderPvtKeys(){
+  var q=document.getElementById('pvtKeySearch').value.trim().toUpperCase();
+  api('/api/admin/keys').then(function(r){
+    var tbody=document.getElementById('pvtKeysTable');
+    var all=r.keys||[];
+    var pvt=all.filter(function(k){return k.product==='private'});
+    if(!r.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state">Erro ao carregar keys</div></td></tr>';return}
+    document.getElementById('pvtKeyCountInfo').textContent=pvt.length+'/'+all.length;
+    if(!pvt.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">&#128273;</div>Nenhuma key private</div></td></tr>';return}
+    tbody.innerHTML='';
+    pvt.forEach(function(k,i){
+      if(q&&!k.key.toUpperCase().includes(q))return;
+      var tr=document.createElement('tr');
+      tr.style.animation='fadeIn .3s '+(i*0.02)+'s both';
+      var statHtml=k.used_by?'<span class="tag tag-yellow">Em uso</span>':'<span class="tag tag-green">Disponivel</span>';
+      var dur=k.used_by?k.duration_days+' dias':'---';
+      var created=k.created_at?new Date(k.created_at*1e3).toLocaleDateString('pt-BR'):'---';
+      var act='<button class="btn btn-sm btn-danger" onclick="delPvtKey(\''+k.key+'\')" style="padding:3px 10px;font-size:.72rem">Deletar</button>';
+      tr.innerHTML='<td style="font-family:monospace;font-size:.82rem">'+k.key+'</td><td>'+statHtml+'</td><td style="font-size:.82rem">'+dur+'</td><td style="color:var(--muted)">'+created+'</td><td><div style="display:flex;gap:4px">'+act+'</div></td>';
+      tbody.appendChild(tr)
+    });
+    document.getElementById('statPvtKeys').textContent=pvt.length;
   })
 }
 
