@@ -225,6 +225,16 @@ def init_db():
         except:
             pass
 
+    # Migração: resetar keys que foram aprovadas mas nunca usadas no registro
+    try:
+        if using_pg:
+            db_exec("UPDATE keys SET used_by = NULL, used_at = NULL WHERE used_by IS NOT NULL AND used_by NOT IN (SELECT username FROM users)")
+        else:
+            db.execute("UPDATE keys SET used_by = NULL, used_at = NULL WHERE used_by IS NOT NULL AND used_by NOT IN (SELECT username FROM users)")
+            db.commit()
+    except Exception as e:
+        print(f"[INIT] Migration: {e}")
+
 def now():
     return int(time.time())
 
