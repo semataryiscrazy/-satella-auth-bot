@@ -1370,7 +1370,13 @@ def run_flask():
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def run_bot():
-    bot.run(CONFIG["token"])
+    token = CONFIG.get("token", "")
+    if not token or token == "DISCORD_TOKEN_AQUI":
+        print("[BOT] Token não configurado! Configure DISCORD_TOKEN no Render.")
+        return
+    # Força criação de nova sessão HTTP (evita "Session is closed" em retry)
+    bot.http._session = None
+    bot.run(token)
 
 if __name__ == "__main__":
     print("[AUTH] Iniciando sistema...")
