@@ -969,11 +969,11 @@ async def aprovar_pagamento(member: discord.Member, plan: str, txid: str = None)
     k = gen_key()
     try:
         if using_pg:
-            db_exec("INSERT INTO keys (key, duration_days, used_by, used_at, created_at) VALUES (%s, %s, %s, %s, %s)",
-                    (k, dias, member.name, now(), now()))
+            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (%s, %s, %s)",
+                    (k, dias, now()))
         else:
-            db_exec("INSERT INTO keys (key, duration_days, used_by, used_at, created_at) VALUES (?, ?, ?, ?, ?)",
-                    (k, dias, member.name, now(), now()))
+            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (?, ?, ?)",
+                    (k, dias, now()))
             db_commit()
     except Exception as e:
         print(f"[SALES] Erro ao inserir key: {e}")
