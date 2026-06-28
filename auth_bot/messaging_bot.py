@@ -128,6 +128,7 @@ PLANOS = {
     "semanal":  {"nome": "Semanal",  "preco": 50,  "dias": 7,     "emoji": "\U0001f550"},
     "mensal":   {"nome": "Mensal",   "preco": 100, "dias": 30,    "emoji": "\U0001f4c5"},
     "lifetime": {"nome": "Lifetime", "preco": 500, "dias": 36500, "emoji": "\u26a1"},
+    "basic":    {"nome": "Basic",    "preco": 25,  "dias": 15,    "emoji": "\U0001f539"},
 }
 
 BANNER = "https://i.imgur.com/DSxv3VU.png"
@@ -324,6 +325,7 @@ class PlanSelect(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.select(placeholder="Escolha seu plano...", options=[
+        discord.SelectOption(label="Basic - R$25", description="15 dias de acesso", value="basic", emoji="\U0001f539"),
         discord.SelectOption(label="Diario - R$15", description="1 dia de acesso", value="diario", emoji="\U0001f4a5"),
         discord.SelectOption(label="Semanal - R$50", description="7 dias de acesso", value="semanal", emoji="\U0001f550"),
         discord.SelectOption(label="Mensal - R$100", description="30 dias de acesso", value="mensal", emoji="\U0001f4c5"),
@@ -397,6 +399,7 @@ async def cmd_painel(i: discord.Interaction):
     )
     embed.set_image(url=BANNER)
     embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
+        "\U0001f539 **Basic** — R$25,00 *(15 dias)*\n"
         "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
         "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
         "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
@@ -409,6 +412,7 @@ async def cmd_painel(i: discord.Interaction):
 @bot.tree.command(name="comprar", description="Iniciar processo de compra")
 @app_commands.describe(plano="Plano desejado")
 @app_commands.choices(plano=[
+    app_commands.Choice(name="Basic - R$25 (15 dias)", value="basic"),
     app_commands.Choice(name="Diario - R$15 (1 dia)", value="diario"),
     app_commands.Choice(name="Semanal - R$50 (7 dias)", value="semanal"),
     app_commands.Choice(name="Mensal - R$100 (30 dias)", value="mensal"),

@@ -948,6 +948,7 @@ PLANOS = {
     "semanal":  {"nome": "Semanal",  "preco": 50,  "dias": 7,     "emoji": "\U0001f550"},
     "mensal":   {"nome": "Mensal",   "preco": 100, "dias": 30,    "emoji": "\U0001f4c5"},
     "lifetime": {"nome": "Lifetime", "preco": 500, "dias": 36500, "emoji": "\u26a1"},
+    "basic":    {"nome": "Basic",    "preco": 25,  "dias": 15,    "emoji": "\U0001f539"},
 }
 
 async def enviar_key_dm(member: discord.Member, key: str, dias: int, plano_nome: str):
@@ -1022,6 +1023,7 @@ class PlanSelect(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.select(placeholder="Escolha seu plano...", options=[
+        discord.SelectOption(label="Basic - R$25", description="15 dias de acesso", value="basic", emoji="\U0001f539"),
         discord.SelectOption(label="Diario - R$15", description="1 dia de acesso", value="diario", emoji="\U0001f4a5"),
         discord.SelectOption(label="Semanal - R$50", description="7 dias de acesso", value="semanal", emoji="\U0001f550"),
         discord.SelectOption(label="Mensal - R$100", description="30 dias de acesso", value="mensal", emoji="\U0001f4c5"),
@@ -1191,8 +1193,13 @@ class AdminApproveView(discord.ui.View):
             child.disabled = True
         await i.message.edit(view=self)
 
-@bot.tree.command(name="private", description="Enviar painel Private")
-async def cmd_private(i: discord.Interaction):
+class PrivateGroup(app_commands.Group):
+    pass
+
+private_group = PrivateGroup(name="private", description="Comandos do Private")
+
+@private_group.command(name="painel", description="Enviar painel Private")
+async def cmd_private_painel(i: discord.Interaction):
     if not is_admin(i):
         return await i.response.send_message("Sem permissao.", ephemeral=True)
     embed = discord.Embed(
@@ -1211,6 +1218,7 @@ async def cmd_private(i: discord.Interaction):
     )
     embed.set_image(url=BANNER)
     embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
+        "\U0001f539 **Basic** — R$25,00 *(15 dias)*\n"
         "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
         "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
         "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
@@ -1219,6 +1227,65 @@ async def cmd_private(i: discord.Interaction):
     embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
     await i.channel.send(embed=embed, view=PainelView())
     await i.response.send_message("Painel Private postado!", ephemeral=True)
+
+@private_group.command(name="basic", description="Comprar plano Basic - R$25 (15 dias)")
+async def cmd_private_basic(i: discord.Interaction):
+    info = PLANOS.get("basic")
+    txid = secrets.token_hex(8)
+    valor = info["preco"]
+    chave = CONFIG.get("pix_key", "")
+    if not chave:
+        return await i.response.send_message("PIX nao configurado. Contacte o admin.", ephemeral=True)
+    nome = CONFIG.get("pix_name", "Satella")
+    brcode = gerar_pix_brcode(chave, valor, nome, txid=txid)
+    qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={brcode}"
+    try:
+        if using_pg:
+            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (%s, %s, %s, 'pending', %s)",
+                    (txid, str(i.user.id), "basic", now()))
+        else:
+            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+                    (txid, str(i.user.id), "basic", now()))
+            db_commit()
+    except:
+        try:
+            if not using_pg:
+                db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER)")
+                db_commit()
+                db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+                        (txid, str(i.user.id), "basic", now()))
+                db_commit()
+        except Exception as e:
+            return await i.response.send_message(f"Erro ao criar pagamento: {e}", ephemeral=True)
+    embed = discord.Embed(
+        title=f"\U0001f4b0 Carrinho - Basic",
+        color=ROSA,
+        description=(
+            f"**Plano:** \U0001f539 Basic\n"
+            f"**Valor:** R$ **{valor:.2f}**\n"
+            f"**Duração:** 15 dias\n\n"
+            f"\U0001f449 **Pague via PIX**\n\n"
+            f"**Chave:** `{chave}`\n"
+            f"**Nome:** {nome}\n\n"
+            f"Pague o valor exato de **R$ {valor:.2f}**\n"
+            f"Depois clique em **\"Já paguei!\"** abaixo."
+        )
+    )
+    embed.set_image(url=qr_url)
+    embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
+    view = ComprovanteView(txid, "basic")
+    try:
+        await i.user.send(embed=embed, view=view)
+        await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
+    except discord.Forbidden:
+        await i.response.send_message(
+            f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
+            f"**Chave PIX:** `{chave}`\n"
+            f"**Valor:** R$ {valor:.2f}\n"
+            f"**QR Code:** {qr_url}",
+            ephemeral=True)
+
+bot.tree.add_command(private_group)
 
 @bot.tree.command(name="painel", description="Enviar painel de vendas")
 async def cmd_painel(i: discord.Interaction):
@@ -1251,6 +1318,7 @@ async def cmd_painel(i: discord.Interaction):
 @bot.tree.command(name="comprar", description="Iniciar processo de compra")
 @app_commands.describe(plano="Plano desejado")
 @app_commands.choices(plano=[
+    app_commands.Choice(name="Basic - R$25 (15 dias)", value="basic"),
     app_commands.Choice(name="Diario - R$15 (1 dia)", value="diario"),
     app_commands.Choice(name="Semanal - R$50 (7 dias)", value="semanal"),
     app_commands.Choice(name="Mensal - R$100 (30 dias)", value="mensal"),
