@@ -472,26 +472,23 @@ async def on_member_join(member: discord.Member):
 async def postar_painel(channel, admin_user):
     from views import MainPanel
     embed = discord.Embed(
-        title="\U0001f451 Satella Private",
+        title="Satella Private",
         color=ROSA,
         description=(
-            "\U0001f451 **SATELLA PRIVATE — O MELHOR BYPASS DO FREE FIRE!** \U0001f451\n\n"
-            "\U0001f6e1 **Totalmente Indetect\u00e1vel:** Passe batido por qualquer anti-cheat \u2705\n"
-            "\u26a1 **Bypass Absoluto:** O melhor bypass do mercado, nada te para \ud83d\udd25\n"
-            "\U0001f3af **Fa\u00e7a de Tudo:** Aimbot, Visual, Wallhack, tudo que voc\u00ea precisa \U0001f4f1\n"
-            "\u274c **N\u00e3o Cai em Apostados:** Zero ban, mesmo nos apostados mais pesados \U0001f6ab\n"
-            "\U0001f4bb **Leve e R\u00e1pido:** Roda em qualquer PC sem lags \U0001f680\n"
-            "\U0001f512 **Atualiza\u00e7\u00e3o Constante:** Sempre atualizado pra voc\u00ea nunca ficar na m\u00e3o \U0001f504\n\n"
-            "\U0001f447 **ADQUIRA J\u00c1 E DOMINE O JOGO!** \U0001f447"
+            "**O MELHOR BYPASS DO FREE FIRE!**\n\n"
+            "Bypass absouto, indetectavel, roda em qualquer PC.\n"
+            "Aimbot, Visual, Wallhack e muito mais.\n"
+            "Atualizacao constante, zero ban em apostados.\n\n"
+            "**Adquira ja e domine o jogo!**"
         )
     )
     embed.set_image(url=BANNER)
-    embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
-        "\U0001f539 **Basic** — R$50,00 *(15 dias)*\n"
-        "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
-        "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
-        "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
-        "\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*"
+    embed.add_field(name="Planos", value=(
+        "\U0001f539 Basic — R$50 (15 dias)\n"
+        "\U0001f4a5 Diario — R$15 (1 dia)\n"
+        "\U0001f550 Semanal — R$50 (7 dias)\n"
+        "\U0001f4c5 Mensal — R$100 (30 dias)\n"
+        "\u26a1 Lifetime — R$500 (Vitalicio)"
     ), inline=False)
     embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
     await channel.send(embed=embed, view=MainPanel())
