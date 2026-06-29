@@ -490,6 +490,7 @@ async def postar_painel(channel, admin_user):
             "- Clique no bot\u00e3o **\"Comprar\"**"
         )
     )
+    embed.set_thumbnail(url="https://i.imgur.com/Fw1vbE7.png")
     embed.set_footer(text="Satella Public", icon_url=bot.user.display_avatar.url if bot.user else None)
     await channel.send(embed=embed, view=MainPanel())
 
