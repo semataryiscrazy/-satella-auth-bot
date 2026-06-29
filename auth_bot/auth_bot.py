@@ -469,10 +469,7 @@ async def on_member_join(member: discord.Member):
 
 # ========== PAINEL DE VENDAS ==========
 
-@bot.tree.command(name="painel", description="Postar o painel de vendas")
-async def cmd_painel(i: discord.Interaction):
-    if not is_admin(i):
-        return await i.response.send_message("Sem permissao.", ephemeral=True)
+async def postar_painel(channel, admin_user):
     from views import MainPanel
     embed = discord.Embed(
         title="\U0001f451 Satella Private",
@@ -497,8 +494,21 @@ async def cmd_painel(i: discord.Interaction):
         "\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*"
     ), inline=False)
     embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
-    await i.channel.send(embed=embed, view=MainPanel())
+    await channel.send(embed=embed, view=MainPanel())
+
+@bot.tree.command(name="painel", description="Postar o painel de vendas")
+async def cmd_painel(i: discord.Interaction):
+    if not is_admin(i):
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
+    await postar_painel(i.channel, i.user)
     await i.response.send_message("Painel postado!", ephemeral=True)
+
+@bot.tree.command(name="painelpriv", description="Postar o painel de vendas Private")
+async def cmd_painelpriv(i: discord.Interaction):
+    if not is_admin(i):
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
+    await postar_painel(i.channel, i.user)
+    await i.response.send_message("Painel Private postado!", ephemeral=True)
 
 @bot.tree.command(name="comprar", description="Iniciar processo de compra")
 @app_commands.describe(plano="Plano desejado")
@@ -566,16 +576,7 @@ async def iniciar_checkout(i: discord.Interaction, plano_key: str, info: dict):
             view = None
             from views import ComprovanteView
             view = ComprovanteView(txid, plano_key)
-            try:
-                await i.user.send(embed=embed, view=view)
-                await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
-            except discord.Forbidden:
-                await i.response.send_message(
-                    f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
-                    f"**PIX Copia e Cola:**\n`{brcode}`\n"
-                    f"**Valor:** R$ {info['preco']:.2f}\n"
-                    f"**QR Code:** {qr_url}",
-                    ephemeral=True)
+            await i.response.send_message(embed=embed, view=view, ephemeral=True)
             log_action("checkout_purincash", str(i.user), f"{plano_key} R${info['preco']}")
             return
 
@@ -612,16 +613,7 @@ async def iniciar_checkout(i: discord.Interaction, plano_key: str, info: dict):
     embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
     from views import ComprovanteView
     view = ComprovanteView(txid, plano_key)
-    try:
-        await i.user.send(embed=embed, view=view)
-        await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
-    except discord.Forbidden:
-        await i.response.send_message(
-            f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
-            f"**Chave PIX:** `{pk}`\n"
-            f"**Valor:** R$ {info['preco']:.2f}\n"
-            f"**QR Code:** {qr_url}",
-            ephemeral=True)
+    await i.response.send_message(embed=embed, view=view, ephemeral=True)
 
 # ========== TICKETS ==========
 
