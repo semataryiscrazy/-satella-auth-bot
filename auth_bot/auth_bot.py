@@ -1340,7 +1340,6 @@ def run_bot():
     if not token or token == "DISCORD_TOKEN_AQUI":
         print("[BOT] Token nao configurado!")
         return
-    bot.http._session = None
     bot.run(token)
 
 if __name__ == "__main__":
@@ -1351,14 +1350,7 @@ if __name__ == "__main__":
     print(f"[API] Rodando na porta {CONFIG['api_port']}")
     t2 = threading.Thread(target=cleanup_tokens, daemon=True)
     t2.start()
-    while True:
-        try:
-            print("[BOT] Conectando ao Discord...")
-            run_bot()
-        except Exception as e:
-            import traceback
-            print(f"[BOT] Erro ao conectar Discord: {e}")
-            traceback.print_exc()
-        print("[BOT] Desconectou, reconectando em 15s...")
-        import time as _time
-        _time.sleep(15)
+    import time as _time
+    _time.sleep(2)
+    print("[BOT] Conectando ao Discord...")
+    run_bot()
