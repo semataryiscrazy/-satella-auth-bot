@@ -1325,6 +1325,10 @@ def run_bot():
 if __name__ == "__main__":
     print("[AUTH] Iniciando sistema unificado...")
     init_db()
+    print(f"[CONFIG] PurinCash key: {'CONFIGURADA' if CONFIG.get('purincash_key') else 'FALTANDO'}")
+    print(f"[CONFIG] Webhook URL: {'CONFIGURADA' if CONFIG.get('webhook_url') else 'FALTANDO'}")
+    print(f"[CONFIG] Discord token: {'CONFIGURADO' if CONFIG.get('token') else 'FALTANDO'}")
+    print(f"[CONFIG] Guild ID: {CONFIG.get('guild_id', 0)}")
     t1 = threading.Thread(target=run_flask, daemon=True)
     t1.start()
     print(f"[API] Rodando na porta {CONFIG['api_port']}")
