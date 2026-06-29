@@ -20,11 +20,6 @@ class MainPanel(discord.ui.View):
     async def adquirir(self, i: discord.Interaction, b: discord.ui.Button):
         await i.response.send_message("Selecione o plano desejado:", view=PlanSelect(), ephemeral=True)
 
-    @discord.ui.button(label="Suporte", style=discord.ButtonStyle.secondary, custom_id="main_suporte", emoji="\U0001f4ac")
-    async def suporte(self, i: discord.Interaction, b: discord.ui.Button):
-        from auth_bot import criar_ticket
-        await criar_ticket(i, "suporte")
-
 class PlanSelect(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
