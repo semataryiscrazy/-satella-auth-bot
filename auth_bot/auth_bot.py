@@ -482,7 +482,6 @@ async def postar_painel(channel, admin_user):
             "**Adquira ja e domine o jogo!**"
         )
     )
-    embed.set_image(url=BANNER)
     embed.add_field(name="Planos", value=(
         "\U0001f539 Basic — R$50 (15 dias)\n"
         "\U0001f4a5 Diario — R$15 (1 dia)\n"
