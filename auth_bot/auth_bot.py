@@ -8,10 +8,15 @@ import string
 import json
 import threading
 import time
+import hmac
+import hashlib as hl
 from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify
 import os
 import re
+import asyncio
+import urllib.request
+import urllib.parse
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 config_path = os.path.join(script_dir, "config.json")
@@ -47,32 +52,107 @@ if admins_env:
 elif "admins" not in CONFIG:
     CONFIG["admins"] = {}
 
-CONFIG.setdefault("pix_key", "")
-CONFIG.setdefault("pix_value", "25.00")
-CONFIG.setdefault("pix_name", "Satella")
-CONFIG.setdefault("ticket_category_id", 0)
-CONFIG.setdefault("sales_channel_id", 0)
-CONFIG.setdefault("welcome_channel_id", 0)
-CONFIG.setdefault("welcome_role_id", 0)
 CONFIG.setdefault("log_channel_id", 0)
 CONFIG.setdefault("client_role_id", 0)
+CONFIG.setdefault("guild_id", 0)
+CONFIG.setdefault("welcome_channel_id", 0)
+CONFIG.setdefault("welcome_role_id", 0)
+CONFIG.setdefault("ticket_category_id", 0)
+CONFIG.setdefault("purincash_key", "")
+CONFIG.setdefault("purincash_webhook_secret", "")
+CONFIG.setdefault("webhook_url", "")
 
-if os.environ.get("PIX_KEY"):
-    CONFIG["pix_key"] = os.environ["PIX_KEY"]
-if os.environ.get("PIX_NAME"):
-    CONFIG["pix_name"] = os.environ["PIX_NAME"]
-if os.environ.get("TICKET_CATEGORY_ID"):
-    CONFIG["ticket_category_id"] = int(os.environ["TICKET_CATEGORY_ID"])
-if os.environ.get("GUILD_ID"):
-    CONFIG["guild_id"] = int(os.environ["GUILD_ID"])
-if os.environ.get("WELCOME_CHANNEL_ID"):
-    CONFIG["welcome_channel_id"] = int(os.environ["WELCOME_CHANNEL_ID"])
-if os.environ.get("WELCOME_ROLE_ID"):
-    CONFIG["welcome_role_id"] = int(os.environ["WELCOME_ROLE_ID"])
-if os.environ.get("LOG_CHANNEL_ID"):
-    CONFIG["log_channel_id"] = int(os.environ["LOG_CHANNEL_ID"])
-if os.environ.get("CLIENT_ROLE_ID"):
-    CONFIG["client_role_id"] = int(os.environ["CLIENT_ROLE_ID"])
+for env_key, config_key in [
+    ("PURINCASH_KEY", "purincash_key"),
+    ("PURINCASH_WEBHOOK_SECRET", "purincash_webhook_secret"),
+    ("WEBHOOK_URL", "webhook_url"),
+    ("LOG_CHANNEL_ID", "log_channel_id"),
+    ("CLIENT_ROLE_ID", "client_role_id"),
+    ("GUILD_ID", "guild_id"),
+    ("WELCOME_CHANNEL_ID", "welcome_channel_id"),
+    ("WELCOME_ROLE_ID", "welcome_role_id"),
+    ("TICKET_CATEGORY_ID", "ticket_category_id"),
+]:
+    val = os.environ.get(env_key)
+    if val:
+        if env_key.endswith("_ID"):
+            CONFIG[config_key] = int(val)
+        else:
+            CONFIG[config_key] = val
+
+# ========== PURINCASH API ==========
+
+PURINCASH_API = "https://api.purincash.com/v1"
+
+def purincash_headers():
+    key = CONFIG.get("purincash_key", "")
+    if not key:
+        return None
+    return {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+def purincash_create_payment(value_cents: int, description: str, callback_url: str, metadata: str = "", customer_name: str = "", customer_email: str = "", customer_external_id: str = ""):
+    headers = purincash_headers()
+    if not headers:
+        return None
+    data = {
+        "valueCents": value_cents,
+        "description": description[:200],
+        "callbackUrl": callback_url,
+    }
+    if metadata:
+        data["metadata"] = metadata
+    if customer_name or customer_email or customer_external_id:
+        data["customer"] = {}
+        if customer_name:
+            data["customer"]["name"] = customer_name[:100]
+        if customer_email:
+            data["customer"]["email"] = customer_email[:255]
+        if customer_external_id:
+            data["customer"]["externalId"] = customer_external_id[:200]
+    try:
+        req = urllib.request.Request(
+            f"{PURINCASH_API}/payments",
+            data=json.dumps(data).encode(),
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"[PURINCASH] HTTP {e.code}: {body}")
+        return None
+    except Exception as e:
+        print(f"[PURINCASH] Error: {e}")
+        return None
+
+def purincash_check_payment(payment_id: str):
+    headers = purincash_headers()
+    if not headers:
+        return None
+    try:
+        req = urllib.request.Request(
+            f"{PURINCASH_API}/payments/{payment_id}",
+            headers=headers,
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"[PURINCASH] Check error: {e}")
+        return None
+
+def purincash_verify_webhook(body: bytes, signature: str) -> bool:
+    secret = CONFIG.get("purincash_webhook_secret", "")
+    if not secret:
+        return True
+    expected = hmac.new(secret.encode(), body, hl.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+# ========== PIX BRCODE (fallback manual) ==========
 
 def gerar_pix_brcode(chave: str, valor: float, nome: str, cidade: str = "Sao Paulo", txid: str = "***") -> str:
     def crc16(s: str) -> str:
@@ -96,6 +176,8 @@ def gerar_pix_brcode(chave: str, valor: float, nome: str, cidade: str = "Sao Pau
         + add(58, "BR") + add(59, nome_fmt) + add(60, cidade_fmt)
         + add(62, add(5, txid)))
     return payload + "6304" + crc16(payload + "6304")
+
+# ========== DATABASE ==========
 
 DB = None
 lock = threading.Lock()
@@ -207,33 +289,28 @@ def init_db():
         db_exec("CREATE TABLE IF NOT EXISTS keys (id SERIAL PRIMARY KEY, key TEXT UNIQUE NOT NULL, duration_days INTEGER NOT NULL, used_by TEXT DEFAULT NULL, used_at INTEGER DEFAULT NULL, created_at INTEGER NOT NULL)")
         db_exec("CREATE TABLE IF NOT EXISTS logs (id SERIAL PRIMARY KEY, action TEXT NOT NULL, username TEXT DEFAULT '', detail TEXT DEFAULT '', ip TEXT DEFAULT '', timestamp INTEGER NOT NULL)")
         db_exec("CREATE TABLE IF NOT EXISTS tickets (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, ticket_type TEXT NOT NULL DEFAULT 'support', status TEXT NOT NULL DEFAULT 'open', payment_status TEXT DEFAULT 'pending', plan TEXT DEFAULT '', created_at INTEGER NOT NULL, closed_at INTEGER DEFAULT NULL)")
-        db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id SERIAL PRIMARY KEY, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER)")
-        try:
-            db_exec("ALTER TABLE tickets ADD COLUMN plan TEXT DEFAULT ''")
-        except:
-            pass
+        db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id SERIAL PRIMARY KEY, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', purincash_id TEXT DEFAULT '', created_at INTEGER)")
     else:
         db.executescript("""CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, hwid TEXT DEFAULT '', created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, banned INTEGER DEFAULT 0);
             CREATE TABLE IF NOT EXISTS keys (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE NOT NULL, duration_days INTEGER NOT NULL, used_by TEXT DEFAULT NULL, used_at INTEGER DEFAULT NULL, created_at INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, username TEXT DEFAULT '', detail TEXT DEFAULT '', ip TEXT DEFAULT '', timestamp INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, channel_id INTEGER NOT NULL, ticket_type TEXT NOT NULL DEFAULT 'support', status TEXT NOT NULL DEFAULT 'open', payment_status TEXT DEFAULT 'pending', plan TEXT DEFAULT '', created_at INTEGER NOT NULL, closed_at INTEGER DEFAULT NULL);
-            CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER);""")
+            CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', purincash_id TEXT DEFAULT '', created_at INTEGER);""")
         db.commit()
-        try:
-            db.execute("ALTER TABLE tickets ADD COLUMN plan TEXT DEFAULT ''")
-            db.commit()
-        except:
-            pass
-
-    # Migração: resetar keys que foram aprovadas mas nunca usadas no registro
     try:
         if using_pg:
-            db_exec("UPDATE keys SET used_by = NULL, used_at = NULL WHERE used_by IS NOT NULL AND used_by NOT IN (SELECT username FROM users)")
+            db_exec("ALTER TABLE pix_pending ADD COLUMN purincash_id TEXT DEFAULT ''")
         else:
+            db.execute("ALTER TABLE pix_pending ADD COLUMN purincash_id TEXT DEFAULT ''")
+            db.commit()
+    except:
+        pass
+    try:
+        if not using_pg:
             db.execute("UPDATE keys SET used_by = NULL, used_at = NULL WHERE used_by IS NOT NULL AND used_by NOT IN (SELECT username FROM users)")
             db.commit()
-    except Exception as e:
-        print(f"[INIT] Migration: {e}")
+    except:
+        pass
 
 def now():
     return int(time.time())
@@ -248,6 +325,31 @@ def hash_pw(pw):
 def make_token():
     return secrets.token_hex(32)
 
+def log_action(action, username, detail="", ip=""):
+    try:
+        if using_pg:
+            db_exec("INSERT INTO logs (action, username, detail, ip, timestamp) VALUES (%s, %s, %s, %s, %s)", (action, username, detail, ip, now()))
+        else:
+            get_db().execute("INSERT INTO logs (action, username, detail, ip, timestamp) VALUES (?, ?, ?, ?, ?)", (action, username, detail, ip, now()))
+            get_db().commit()
+    except:
+        pass
+
+# ========== PLANOS ==========
+
+ROSA = 0xDB00A6
+BANNER = "https://i.imgur.com/DSxv3VU.png"
+
+PLANOS = {
+    "basic":    {"nome": "Basic",    "preco": 50,  "dias": 15,   "emoji": "\U0001f539", "desc": "15 dias de acesso"},
+    "diario":   {"nome": "Diario",   "preco": 15,  "dias": 1,    "emoji": "\U0001f4a5", "desc": "1 dia de acesso"},
+    "semanal":  {"nome": "Semanal",  "preco": 50,  "dias": 7,    "emoji": "\U0001f550", "desc": "7 dias de acesso"},
+    "mensal":   {"nome": "Mensal",   "preco": 100, "dias": 30,   "emoji": "\U0001f4c5", "desc": "30 dias de acesso"},
+    "lifetime": {"nome": "Lifetime", "preco": 500, "dias": 36500,"emoji": "\u26a1",     "desc": "Acesso vitalicio"},
+}
+
+# ========== DISCORD BOT ==========
+
 tokens = {}
 intents = discord.Intents.default()
 intents.message_content = False
@@ -257,8 +359,271 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 def is_admin(interaction: discord.Interaction):
     return interaction.user.id in CONFIG["admin_ids"]
 
-class AdminGroup(app_commands.Group):
-    pass
+async def enviar_key_dm(member: discord.Member, key: str, dias: int, plano_nome: str):
+    embed = discord.Embed(
+        title="\u2705 Pagamento Aprovado!",
+        color=discord.Color.green(),
+        description=(
+            f"**Sua key foi gerada:**\n"
+            f"```\n{key}\n```\n"
+            f"**Plano:** {plano_nome}\n"
+            f"**Dura\u00e7\u00e3o:** {dias} dia(s)\n\n"
+            f"Use o loader para baixar o Satella.\n"
+            f"Obrigado pela prefer\u00eancia! \u2764"
+        )
+    )
+    embed.set_image(url=BANNER)
+    embed.set_footer(text="Satella Private")
+    try:
+        await member.send(embed=embed)
+        return True
+    except:
+        return False
+
+async def aprovar_pagamento(member: discord.Member, plan: str, purincash_id: str = None):
+    info = PLANOS.get(plan)
+    if not info:
+        return None
+    dias = info["dias"]
+    k = gen_key()
+    try:
+        if using_pg:
+            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (%s, %s, %s)", (k, dias, now()))
+        else:
+            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (?, ?, ?)", (k, dias, now()))
+            db_commit()
+    except Exception as e:
+        print(f"[SALES] Erro ao inserir key: {e}")
+        return None
+    if purincash_id:
+        try:
+            if using_pg:
+                db_exec("UPDATE pix_pending SET status = 'paid' WHERE purincash_id = %s", (purincash_id,))
+            else:
+                db_exec("UPDATE pix_pending SET status = 'paid' WHERE purincash_id = ?", (purincash_id,))
+                db_commit()
+        except:
+            pass
+    role_id = CONFIG.get("client_role_id", 0)
+    if role_id and isinstance(member, discord.Member):
+        role = member.guild.get_role(role_id)
+        if role:
+            try:
+                await member.add_roles(role)
+            except:
+                pass
+    await enviar_key_dm(member, k, dias, info["nome"])
+    log_action(f"APROVADO: {member} ({member.id})", plan, f"key={k}")
+    return k
+
+# ========== BOT EVENTS ==========
+
+@bot.event
+async def on_ready():
+    print(f"[BOT] Logado como {bot.user}")
+    from views import MainPanel, AdminApproveView, ComprovanteView, SuporteClose, SuporteConfirmClose
+    bot.add_view(MainPanel())
+    bot.add_view(ComprovanteView("", ""))
+    bot.add_view(AdminApproveView("", "", 0))
+    bot.add_view(SuporteClose())
+    bot.add_view(SuporteConfirmClose())
+    guild_id = CONFIG.get("guild_id", 0)
+    try:
+        if guild_id:
+            guild_obj = discord.Object(id=guild_id)
+            bot.tree.copy_global_to(guild=guild_obj)
+            synced = await bot.tree.sync(guild=guild_obj)
+            print(f"[BOT] {len(synced)} comandos sincronizados na guild {guild_id}")
+        else:
+            synced = await bot.tree.sync()
+            print(f"[BOT] {len(synced)} comandos sincronizados globalmente")
+    except Exception as e:
+        print(f"[BOT] Erro sync: {e}")
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    guild = member.guild
+    role_id = CONFIG.get("welcome_role_id", 0)
+    if role_id:
+        role = guild.get_role(role_id)
+        if role:
+            try:
+                await member.add_roles(role)
+            except Exception as e:
+                print(f"[BOT] Erro ao atribuir cargo: {e}")
+    channel_id = CONFIG.get("welcome_channel_id", 0)
+    if channel_id:
+        channel = guild.get_channel(channel_id)
+        if channel:
+            embed = discord.Embed(
+                title="\U0001f44b Bem-vindo!",
+                color=ROSA,
+                description=f"**{member.mention} entrou no servidor!**\n\nBem-vindo(a) ao **Satella Private**!\nUse `/painel` para adquirir sua licenca.",
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text="Satella Private")
+            try:
+                await channel.send(embed=embed)
+            except:
+                pass
+
+# ========== PAINEL DE VENDAS ==========
+
+@bot.tree.command(name="painel", description="Postar o painel de vendas")
+async def cmd_painel(i: discord.Interaction):
+    if not is_admin(i):
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
+    from views import MainPanel
+    embed = discord.Embed(
+        title="\U0001f451 Satella Private",
+        color=ROSA,
+        description=(
+            "\U0001f451 **SATELLA PRIVATE — O MELHOR BYPASS DO FREE FIRE!** \U0001f451\n\n"
+            "\U0001f6e1 **Totalmente Indetect\u00e1vel:** Passe batido por qualquer anti-cheat \u2705\n"
+            "\u26a1 **Bypass Absoluto:** O melhor bypass do mercado, nada te para \ud83d\udd25\n"
+            "\U0001f3af **Fa\u00e7a de Tudo:** Aimbot, Visual, Wallhack, tudo que voc\u00ea precisa \U0001f4f1\n"
+            "\u274c **N\u00e3o Cai em Apostados:** Zero ban, mesmo nos apostados mais pesados \U0001f6ab\n"
+            "\U0001f4bb **Leve e R\u00e1pido:** Roda em qualquer PC sem lags \U0001f680\n"
+            "\U0001f512 **Atualiza\u00e7\u00e3o Constante:** Sempre atualizado pra voc\u00ea nunca ficar na m\u00e3o \U0001f504\n\n"
+            "\U0001f447 **ADQUIRA J\u00c1 E DOMINE O JOGO!** \U0001f447"
+        )
+    )
+    embed.set_image(url=BANNER)
+    embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
+        "\U0001f539 **Basic** — R$50,00 *(15 dias)*\n"
+        "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
+        "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
+        "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
+        "\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*"
+    ), inline=False)
+    embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
+    await i.channel.send(embed=embed, view=MainPanel())
+    await i.response.send_message("Painel postado!", ephemeral=True)
+
+@bot.tree.command(name="comprar", description="Iniciar processo de compra")
+@app_commands.describe(plano="Plano desejado")
+@app_commands.choices(plano=[
+    app_commands.Choice(name="Basic - R$50 (15 dias)", value="basic"),
+    app_commands.Choice(name="Diario - R$15 (1 dia)", value="diario"),
+    app_commands.Choice(name="Semanal - R$50 (7 dias)", value="semanal"),
+    app_commands.Choice(name="Mensal - R$100 (30 dias)", value="mensal"),
+    app_commands.Choice(name="Lifetime - R$500 (Vitalicio)", value="lifetime"),
+])
+async def cmd_comprar(i: discord.Interaction, plano: str):
+    info = PLANOS.get(plano)
+    if not info:
+        return await i.response.send_message("Plano invalido.", ephemeral=True)
+    await iniciar_checkout(i, plano, info)
+
+async def iniciar_checkout(i: discord.Interaction, plano_key: str, info: dict):
+    valor_centavos = int(info["preco"] * 100)
+    chave_pix = CONFIG.get("purincash_key", "")
+    callback_url = CONFIG.get("webhook_url", "")
+
+    if chave_pix and callback_url:
+        metadata = json.dumps({"plan": plano_key, "user_id": str(i.user.id), "discord_tag": str(i.user)})
+        result = purincash_create_payment(
+            value_cents=valor_centavos,
+            description=f"Satella {info['nome']}",
+            callback_url=callback_url.rstrip("/") + "/api/pix/webhook",
+            metadata=metadata,
+            customer_name=i.user.name,
+            customer_external_id=str(i.user.id),
+        )
+        if result and result.get("paymentId"):
+            purincash_id = result["paymentId"]
+            brcode = result.get("pix", {}).get("brCode", "")
+            qr_url = result.get("pix", {}).get("qrCodeImage", "")
+            if not qr_url and brcode:
+                qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={urllib.parse.quote(brcode)}"
+            txid = purincash_id
+            try:
+                if using_pg:
+                    db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, purincash_id, created_at) VALUES (%s, %s, %s, 'pending', %s, %s)",
+                            (txid, str(i.user.id), plano_key, purincash_id, now()))
+                else:
+                    db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, purincash_id, created_at) VALUES (?, ?, ?, 'pending', ?, ?)",
+                            (txid, str(i.user.id), plano_key, purincash_id, now()))
+                    db_commit()
+            except:
+                pass
+            embed = discord.Embed(
+                title=f"\U0001f4b0 Carrinho - {info['nome']}",
+                color=ROSA,
+                description=(
+                    f"**Plano:** {info['emoji']} {info['nome']}\n"
+                    f"**Valor:** R$ **{info['preco']:.2f}**\n"
+                    f"**Dura\u00e7\u00e3o:** {info['dias']} dia(s)\n\n"
+                    f"\U0001f449 **Pague via PIX**\n\n"
+                    f"**PIX Copia e Cola:**\n`{brcode}`\n\n"
+                    f"Pague o valor exato de **R$ {info['preco']:.2f}**\n"
+                    f"Ap\u00f3s o pagamento, a key ser\u00e1 **entregue automaticamente**!"
+                )
+            )
+            if qr_url:
+                embed.set_image(url=qr_url)
+            embed.set_footer(text=f"Satella Private • ID: {purincash_id[:12]}...")
+            view = None
+            from views import ComprovanteView
+            view = ComprovanteView(txid, plano_key)
+            try:
+                await i.user.send(embed=embed, view=view)
+                await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
+            except discord.Forbidden:
+                await i.response.send_message(
+                    f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
+                    f"**PIX Copia e Cola:**\n`{brcode}`\n"
+                    f"**Valor:** R$ {info['preco']:.2f}\n"
+                    f"**QR Code:** {qr_url}",
+                    ephemeral=True)
+            log_action("checkout_purincash", str(i.user), f"{plano_key} R${info['preco']}")
+            return
+
+    txid = secrets.token_hex(8)
+    try:
+        if using_pg:
+            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (%s, %s, %s, 'pending', %s)",
+                    (txid, str(i.user.id), plano_key, now()))
+        else:
+            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+                    (txid, str(i.user.id), plano_key, now()))
+            db_commit()
+    except:
+        pass
+    pk = CONFIG.get("pix_key", "CHAVE_PIX_AQUI")
+    pn = CONFIG.get("pix_name", "Satella")
+    brcode = gerar_pix_brcode(pk, info["preco"], pn, txid=txid)
+    qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={urllib.parse.quote(brcode)}"
+    embed = discord.Embed(
+        title=f"\U0001f4b0 Carrinho - {info['nome']}",
+        color=ROSA,
+        description=(
+            f"**Plano:** {info['emoji']} {info['nome']}\n"
+            f"**Valor:** R$ **{info['preco']:.2f}**\n"
+            f"**Dura\u00e7\u00e3o:** {info['dias']} dia(s)\n\n"
+            f"\U0001f449 **Pague via PIX**\n\n"
+            f"**Chave PIX:** `{pk}`\n"
+            f"**Nome:** {pn}\n\n"
+            f"Pague o valor exato de **R$ {info['preco']:.2f}**\n"
+            f"Depois clique em **\"J\u00e1 paguei!\"** abaixo."
+        )
+    )
+    embed.set_image(url=qr_url)
+    embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
+    from views import ComprovanteView
+    view = ComprovanteView(txid, plano_key)
+    try:
+        await i.user.send(embed=embed, view=view)
+        await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
+    except discord.Forbidden:
+        await i.response.send_message(
+            f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
+            f"**Chave PIX:** `{pk}`\n"
+            f"**Valor:** R$ {info['preco']:.2f}\n"
+            f"**QR Code:** {qr_url}",
+            ephemeral=True)
+
+# ========== TICKETS ==========
 
 async def criar_ticket(i: discord.Interaction, tipo: str, plano: str = None):
     guild = i.guild
@@ -289,117 +654,62 @@ async def criar_ticket(i: discord.Interaction, tipo: str, plano: str = None):
     else:
         db_exec("INSERT INTO tickets (user_id, channel_id, ticket_type, plan, status, payment_status, created_at) VALUES (?, ?, ?, ?, 'open', 'pending', ?)", (str(user.id), str(channel.id), tipo, plano or "", now()))
         db_commit()
-    BANNER = "https://i.imgur.com/DSxv3VU.png"
-    embed = discord.Embed(color=0xDB00A6)
+    embed = discord.Embed(color=ROSA)
     embed.set_image(url=BANNER)
     if tipo == "suporte":
         embed.title = "\U0001f4ac Suporte - Satella Private"
-        embed.description = f"**Bem-vindo(a) {user.mention}!**\n\nDescreva seu problema abaixo.\nUm administrador respondera em breve.\n\n\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581"
-        embed.add_field(name="\U0001f4e1 Como funciona?", value="> Envie prints, videos ou logs do erro\n> Quanto mais detalhes, mais rapido\n> Um admin respondera neste canal", inline=False)
+        embed.description = f"**Bem-vindo(a) {user.mention}!**\n\nDescreva seu problema abaixo.\nUm administrador respondera em breve."
+        from views import SuporteClose
+        msg = await channel.send(content=user.mention, embed=embed)
+        await msg.edit(view=SuporteClose())
     else:
         planos_nomes = {"diario": "Diario - R$15 (1 dia)", "semanal": "Semanal - R$50 (7 dias)", "mensal": "Mensal - R$100 (30 dias)", "lifetime": "Lifetime - R$500 (Vitalicio)"}
         planos_precos = {"diario": "15,00", "semanal": "50,00", "mensal": "100,00", "lifetime": "500,00"}
         planos_valores = {"diario": 15, "semanal": 50, "mensal": 100, "lifetime": 500}
         nome_plano = planos_nomes.get(plano, plano)
-        preco = planos_precos.get(plano, CONFIG.get('pix_value', '25,00'))
+        preco = planos_precos.get(plano, '25,00')
         valor = planos_valores.get(plano, 25)
         pk = CONFIG.get("pix_key", "N/A")
         pn = CONFIG.get("pix_name", "Satella")
         brcode = gerar_pix_brcode(pk, valor, pn)
-        qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={brcode}"
+        qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={urllib.parse.quote(brcode)}"
         embed.title = "\U0001f4b0 Pagamento - Satella Private"
-        embed.description = (f"**Bem-vindo(a) {user.mention}!**\n\n**Plano:** `{nome_plano}`\n**Valor:** R$ **{preco}**\n\n\U0001f449 **Pagamento via PIX**\n\n**Chave:** `{pk}`\n**Nome:** {pn}\n\nPague o valor exato de **R$ {preco}**\ne clique em **\"Enviar Comprovante\"** abaixo.")
+        embed.description = (f"**Bem-vindo(a) {user.mention}!**\n\n**Plano:** `{nome_plano}`\n**Valor:** R$ **{preco}**\n\n\U0001f449 **Pagamento via PIX**\n\n**Chave:** `{pk}`\n**Nome:** {pn}\n\nPague o valor exato de **R$ {preco}** e clique em **\"Enviar Comprovante\"** abaixo.")
         embed.set_image(url=qr_url)
-    embed.set_footer(text=f"Satella Private \u2022 ID: {user.id}", icon_url=bot.user.display_avatar.url if bot.user else None)
-    from views import ComprovanteView, SuporteClose
-    if tipo == "venda":
+        from views import ComprovanteView as TicketComprovanteView
         msg = await channel.send(content=user.mention, embed=embed)
-        await msg.edit(view=ComprovanteView())
-    else:
-        msg = await channel.send(content=user.mention, embed=embed)
-        await msg.edit(view=SuporteClose())
+        await msg.edit(view=TicketComprovanteView())
+    embed.set_footer(text=f"Satella Private • ID: {user.id}", icon_url=bot.user.display_avatar.url if bot.user else None)
     await i.response.send_message(f"Ticket criado: {channel.mention}", ephemeral=True)
 
-@bot.event
-async def on_ready():
-    print(f"[BOT] Logado como {bot.user}")
-    from views import MainPanel, SalesApproveView, SalesPlanSelect, SuporteClose, SuporteConfirmClose, ComprovanteView as OldComprovanteView
-    bot.add_view(MainPanel())
-    bot.add_view(SalesApproveView())
-    bot.add_view(OldComprovanteView())
-    bot.add_view(SuporteClose())
-    bot.add_view(SuporteConfirmClose())
-    bot.add_view(PainelView())
-    bot.add_view(PlanSelect())
-    bot.add_view(ComprovanteView("", ""))
-    bot.add_view(AdminApproveView("", "", 0))
-    guild_id = CONFIG.get("guild_id", 0)
-    try:
-        if guild_id:
-            guild_obj = discord.Object(id=guild_id)
-            bot.tree.copy_global_to(guild=guild_obj)
-            synced = await bot.tree.sync(guild=guild_obj)
-            print(f"[BOT] {len(synced)} comandos sincronizados na guild {guild_id}")
-        else:
-            synced = await bot.tree.sync()
-            print(f"[BOT] {len(synced)} comandos sincronizados globalmente")
-    except Exception as e:
-        print(f"[BOT] Erro sync: {e}")
+# ========== ADMIN COMMANDS ==========
 
-@bot.event
-async def on_member_join(member: discord.Member):
-    guild = member.guild
-    role_id = CONFIG.get("welcome_role_id", 0)
-    if role_id:
-        role = guild.get_role(role_id)
-        if role:
-            try:
-                await member.add_roles(role)
-                print(f"[BOT] Cargo {role.name} atribuido a {member.name}")
-            except Exception as e:
-                print(f"[BOT] Erro ao atribuir cargo: {e}")
-    channel_id = CONFIG.get("welcome_channel_id", 0)
-    if channel_id:
-        channel = guild.get_channel(channel_id)
-        if channel:
-            embed = discord.Embed(
-                title="\U0001f44b Bem-vindo!",
-                color=0xDB00A6,
-                description=f"**{member.mention} entrou no servidor!**\n\nBem-vindo(a) ao **Satella Private**!\nUse `/ticket` para adquirir sua licenca.",
-            )
-            embed.set_thumbnail(url=member.display_avatar.url)
-            embed.set_footer(text="Satella Private")
-            try:
-                await channel.send(embed=embed)
-            except Exception as e:
-                print(f"[BOT] Erro ao enviar welcome: {e}")
-
-admin_group = AdminGroup(name="admin", description="Comandos administrativos")
+admin_group = app_commands.Group(name="admin", description="Comandos administrativos")
 
 @admin_group.command(name="setadmin", description="Adicionar admin pelo Discord ID")
 @app_commands.describe(user_id="ID do usu\u00e1rio Discord")
 async def setadmin(i: discord.Interaction, user_id: str):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
     uid = int(user_id)
     if uid not in CONFIG["admin_ids"]:
         CONFIG["admin_ids"].append(uid)
     await i.response.send_message(f"Admin <@{uid}> adicionado.", ephemeral=True)
 
-@admin_group.command(name="setpix", description="Configurar chave PIX")
-@app_commands.describe(chave="Chave PIX", valor="Valor padr\u00e3o (ex: 25.00)")
+@admin_group.command(name="setpix", description="Configurar chave PIX manual")
+@app_commands.describe(chave="Chave PIX", valor="Valor padrao (ex: 25.00)")
 async def setpix(i: discord.Interaction, chave: str, valor: str = "25.00"):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
     CONFIG["pix_key"] = chave
     CONFIG["pix_value"] = valor
-    await i.response.send_message(f"PIX configurado: `{chave}` (R${valor})", ephemeral=True)
+    await i.response.send_message(f"PIX manual configurado: `{chave}` (R${valor})", ephemeral=True)
 
 @admin_group.command(name="setcategoria", description="Configurar categoria de tickets")
 @app_commands.describe(id="ID da categoria")
 async def setcategoria(i: discord.Interaction, id: str):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
     CONFIG["ticket_category_id"] = int(id)
     await i.response.send_message(f"Categoria configurada: {id}", ephemeral=True)
 
@@ -407,58 +717,50 @@ async def setcategoria(i: discord.Interaction, id: str):
 @app_commands.describe(membro="Membro do Discord")
 async def aprovar(i: discord.Interaction, membro: discord.Member):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
-    db = get_db()
-    if using_pg:
-        rows = db_execall("SELECT * FROM tickets WHERE user_id = %s AND status = 'open' ORDER BY id DESC LIMIT 1", (membro.id,))
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
+    row = db_execone("SELECT * FROM pix_pending WHERE user_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1" if using_pg else "SELECT * FROM pix_pending WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (str(membro.id),))
+    if not row:
+        return await i.response.send_message("Nenhum pagamento pendente para este usuario.", ephemeral=True)
+    row = convert_row(row)
+    k = await aprovar_pagamento(membro, row["plan"], row.get("purincash_id", ""))
+    if k:
+        await i.response.send_message(f"\u2705 Pagamento aprovado! Key `{k}` enviada no PV de {membro.mention}.", ephemeral=True)
     else:
-        rows = db_execall("SELECT * FROM tickets WHERE user_id = ? AND status = 'open' ORDER BY id DESC LIMIT 1", (membro.id,))
-    ticket = rows[0] if rows else None
-    if not ticket:
-        return await i.response.send_message("Nenhum ticket aberto encontrado.", ephemeral=True)
-    ticket = convert_row(ticket) if not isinstance(ticket, dict) else ticket
-    plan_dias = {"diario": 1, "semanal": 7, "mensal": 30, "lifetime": 36500}
-    dias = plan_dias.get(ticket.get("plan", ""), 30)
-    k = gen_key()
-    if using_pg:
-        db_exec("INSERT INTO keys (key, duration_days, used_by, used_at, created_at) VALUES (%s, %s, %s, %s, %s)", (k, dias, membro.name, now(), now()))
-        db_exec("UPDATE tickets SET status = 'approved', payment_status = 'paid' WHERE id = %s", (ticket["id"],))
-    else:
-        db_exec("INSERT INTO keys (key, duration_days, used_by, used_at, created_at) VALUES (?, ?, ?, ?, ?)", (k, dias, membro.name, now(), now()))
-        db_exec("UPDATE tickets SET status = 'approved', payment_status = 'paid' WHERE id = ?", (ticket["id"],))
-        db_commit()
-    try:
-        await membro.send(f"Sua key foi aprovada! Use o loader para baixar.\nKey: `{k}` ({dias} dias)")
-    except:
-        pass
-    await i.response.send_message(f"Pagamento aprovado! Key `{k}` entregue a {membro.mention}.", ephemeral=True)
+        await i.response.send_message("\u274c Erro ao aprovar.", ephemeral=True)
 
 @admin_group.command(name="negar", description="Negar pagamento PIX")
 @app_commands.describe(membro="Membro do Discord")
 async def negar(i: discord.Interaction, membro: discord.Member):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
-    if using_pg:
-        db_exec("UPDATE tickets SET status = 'denied' WHERE user_id = %s AND status = 'open'", (membro.id,))
-    else:
-        db_exec("UPDATE tickets SET status = 'denied' WHERE user_id = ? AND status = 'open'", (membro.id,))
-        db_commit()
-    try:
-        await membro.send("Seu pagamento foi recusado. Entre em contato com o suporte.")
-    except:
-        pass
-    await i.response.send_message(f"Pagamento de {membro.mention} recusado.", ephemeral=True)
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
+    row = db_execone("SELECT * FROM pix_pending WHERE user_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1" if using_pg else "SELECT * FROM pix_pending WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1", (str(membro.id),))
+    if row:
+        row = convert_row(row)
+        if using_pg:
+            db_exec("UPDATE pix_pending SET status = 'denied' WHERE id = %s", (row["id"],))
+        else:
+            db_exec("UPDATE pix_pending SET status = 'denied' WHERE id = ?", (row["id"],))
+            db_commit()
+        try:
+            await membro.send("\u274c Seu pagamento foi recusado. Contacte o suporte.")
+        except:
+            pass
+    await i.response.send_message(f"\u274c Pagamento de {membro.mention} recusado.", ephemeral=True)
 
 bot.tree.add_command(admin_group)
 
-@bot.tree.command(name="ticket", description="Postar o painel de vendas")
+# ========== TICKET COMMAND ==========
+
+@bot.tree.command(name="ticket", description="Postar o painel de tickets")
 async def cmd_ticket(i: discord.Interaction):
     if not is_admin(i):
-        return await i.response.send_message("Sem permissão.", ephemeral=True)
+        return await i.response.send_message("Sem permissao.", ephemeral=True)
     from views import MainPanel
-    BANNER = "https://i.imgur.com/DSxv3VU.png"
-    embed = discord.Embed(title="Satella Private", color=0xDB00A6,
-        description="**Bem-vindo a central de atendimento!**\n\n\U0001f4b0 **Vendas** — Adquira ou renove sua licenca\n\U0001f4ac **Suporte** — Duvidas ou problemas tecnicos\n\nEscolha uma opcao abaixo:")
+    embed = discord.Embed(
+        title="Satella Private",
+        color=ROSA,
+        description="**Bem-vindo a central de atendimento!**\n\n\U0001f4b0 **Vendas** — Adquira ou renove sua licenca\n\U0001f4ac **Suporte** — Duvidas ou problemas tecnicos\n\nEscolha uma opcao abaixo:"
+    )
     embed.set_image(url=BANNER)
     embed.add_field(name="\U0001f48e Planos Disponiveis", value="\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*", inline=False)
     embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
@@ -476,6 +778,112 @@ def serve_panel():
         with open(idx_path, encoding="utf-8") as f:
             return f.read()
     return """<!DOCTYPE html><html lang=pt-BR><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Satella Painel</title><style>body{font-family:'Segoe UI',sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.box{background:#1a1a2e;padding:40px;border-radius:12px;width:340px;text-align:center;box-shadow:0 0 30px rgba(180,0,255,.15)}h1{color:#b388ff;margin-bottom:12px}p{color:#888;font-size:14px}</style></head><body><div class=box><h1>Satella</h1><p>Painel administrativo</p><p style="color:#69f0ae;font-size:13px">Servidor online</p></div></body></html>"""
+
+# ========== PIX WEBHOOK (PURINCASH) ==========
+
+@app.route("/api/pix/webhook", methods=["POST"])
+def pix_webhook():
+    body = request.get_data()
+    signature = request.headers.get("X-Webhook-Signature", "")
+    if not purincash_verify_webhook(body, signature):
+        return jsonify({"success": False, "error": "Invalid signature"}), 401
+    data = request.get_json(silent=True) or {}
+    event = data.get("event", "")
+    if event not in ("payment.paid", "charge.paid"):
+        return jsonify({"success": True, "message": f"Event ignored: {event}"})
+    payment_id = data.get("paymentId", "")
+    if not payment_id:
+        return jsonify({"success": False, "error": "Missing paymentId"}), 400
+    row = db_execone(
+        "SELECT * FROM pix_pending WHERE purincash_id = %s" if using_pg else "SELECT * FROM pix_pending WHERE purincash_id = ?",
+        (payment_id,)
+    )
+    if not row:
+        row = db_execone(
+            "SELECT * FROM pix_pending WHERE txid = %s" if using_pg else "SELECT * FROM pix_pending WHERE txid = ?",
+            (payment_id,)
+        )
+    if not row:
+        metadata_raw = data.get("metadata", "{}")
+        try:
+            meta = json.loads(metadata_raw) if isinstance(metadata_raw, str) else metadata_raw
+        except:
+            meta = {}
+        user_id = meta.get("user_id", "")
+        plan = meta.get("plan", "")
+        if user_id and plan:
+            try:
+                if using_pg:
+                    db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, purincash_id, created_at) VALUES (%s, %s, %s, 'pending', %s, %s)",
+                            (payment_id, user_id, plan, payment_id, now()))
+                else:
+                    db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, purincash_id, created_at) VALUES (?, ?, ?, 'pending', ?, ?)",
+                            (payment_id, user_id, plan, payment_id, now()))
+                    db_commit()
+            except:
+                pass
+            row = db_execone(
+                "SELECT * FROM pix_pending WHERE purincash_id = %s" if using_pg else "SELECT * FROM pix_pending WHERE purincash_id = ?",
+                (payment_id,)
+            )
+    if not row:
+        return jsonify({"success": False, "error": "Payment not found"}), 404
+    row = convert_row(row)
+    if row.get("status") == "paid":
+        return jsonify({"success": True, "message": "Already paid"})
+    member_id = int(row["user_id"])
+    plan = row["plan"]
+    future = asyncio.run_coroutine_threadsafe(
+        _process_webhook_payment(member_id, plan, payment_id),
+        bot.loop
+    )
+    try:
+        result = future.result(timeout=30)
+        if result:
+            return jsonify({"success": True, "key": result})
+        return jsonify({"success": False, "error": "Failed to generate key"}), 500
+    except Exception as e:
+        print(f"[WEBHOOK] Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+async def _process_webhook_payment(member_id: int, plan: str, payment_id: str):
+    guild = None
+    for g in bot.guilds:
+        if g.id == CONFIG.get("guild_id", 0) or g.get_member(member_id):
+            guild = g
+            break
+    member = guild.get_member(member_id) if guild else None
+    if not member:
+        try:
+            member = await bot.fetch_user(member_id)
+        except:
+            member = None
+    if not member:
+        return None
+    result = await aprovar_pagamento(member, plan, payment_id)
+    if result:
+        log_id = CONFIG.get("log_channel_id")
+        if log_id:
+            ch = bot.get_channel(log_id)
+            if ch:
+                try:
+                    await ch.send(f"\u2705 **Pagamento autom\u00e1tico aprovado!**\nComprador: <@{member_id}>\nPlano: {plan}\nKey: `{result}`\n(PurinCash)")
+                except:
+                    pass
+    return result
+
+@app.route("/api/pix/status", methods=["GET"])
+def pix_status():
+    txid = request.args.get("txid", "")
+    if not txid:
+        return jsonify({"success": False, "error": "Missing txid"}), 400
+    row = db_execone("SELECT status FROM pix_pending WHERE txid = %s" if using_pg else "SELECT status FROM pix_pending WHERE txid = ?", (txid,))
+    if not row:
+        return jsonify({"success": False, "error": "Not found"}), 404
+    row = convert_row(row)
+    return jsonify({"success": True, "status": row["status"]})
+
+# ========== ADMIN API ==========
 
 admin_tokens = {}
 
@@ -610,25 +1018,6 @@ def api_admin_keys_delete():
         get_db().execute("DELETE FROM keys WHERE id = ?", (key_id,))
         get_db().commit()
     log_action("admin_delkey", admin, f"id:{key_id}", request.remote_addr)
-    return jsonify({"success": True})
-
-@app.route("/api/admin/keys/delete_by_value", methods=["POST", "OPTIONS"])
-def api_admin_keys_delete_by_value():
-    if request.method == "OPTIONS":
-        return jsonify({"success": True})
-    admin = require_admin()
-    if not admin:
-        return jsonify({"success": False, "error": "N\u00e3o autorizado"})
-    data = request.get_json() or {}
-    key_val = data.get("key", "").strip().upper()
-    if not key_val:
-        return jsonify({"success": False, "error": "Key obrigat\u00f3ria"})
-    if using_pg:
-        db_exec("DELETE FROM keys WHERE key = %s AND used_by IS NULL", (key_val,))
-    else:
-        get_db().execute("DELETE FROM keys WHERE key = ? AND used_by IS NULL", (key_val,))
-        get_db().commit()
-    log_action("admin_delkey_val", admin, key_val[:16], request.remote_addr)
     return jsonify({"success": True})
 
 @app.route("/api/admin/keys/addtime", methods=["POST", "OPTIONS"])
@@ -769,13 +1158,17 @@ def api_admin_config():
         return jsonify({"success": False, "error": "N\u00e3o autorizado"})
     data = request.get_json() or {}
     if data.get("action") == "get":
-        return jsonify({"success": True, "config": {"pix_key": CONFIG.get("pix_key", ""), "pix_value": CONFIG.get("pix_value", "25.00")}})
+        return jsonify({"success": True, "config": {"purincash_key": CONFIG.get("purincash_key", ""), "pix_key": CONFIG.get("pix_key", ""), "pix_value": CONFIG.get("pix_value", "25.00"), "webhook_url": CONFIG.get("webhook_url", "")}})
     if data.get("action") == "set":
         if "pix_key" in data: CONFIG["pix_key"] = data["pix_key"]
         if "pix_value" in data: CONFIG["pix_value"] = data["pix_value"]
+        if "purincash_key" in data: CONFIG["purincash_key"] = data["purincash_key"]
+        if "webhook_url" in data: CONFIG["webhook_url"] = data["webhook_url"]
         log_action("admin_config", admin, "config atualizada", request.remote_addr)
         return jsonify({"success": True, "message": "Configura\u00e7\u00e3o salva"})
     return jsonify({"success": False, "error": "A\u00e7\u00e3o inv\u00e1lida"})
+
+# ========== LOADER API ==========
 
 @app.route("/api/login", methods=["POST", "OPTIONS"])
 def api_login():
@@ -881,28 +1274,6 @@ def api_check():
     r = convert_row(r)
     return jsonify({"success": True, "exists": True, "banned": bool(r["banned"]), "expired": r["expires_at"] < now()})
 
-def log_action(action, username, detail="", ip=""):
-    try:
-        if using_pg:
-            db_exec("INSERT INTO logs (action, username, detail, ip, timestamp) VALUES (%s, %s, %s, %s, %s)", (action, username, detail, ip, now()))
-        else:
-            get_db().execute("INSERT INTO logs (action, username, detail, ip, timestamp) VALUES (?, ?, ?, ?, ?)", (action, username, detail, ip, now()))
-            get_db().commit()
-    except:
-        pass
-
-@app.route("/api/logs", methods=["GET"])
-def api_logs():
-    auth = request.headers.get("Authorization", "")
-    if auth not in [f"Bearer {t}" for t in tokens if tokens[t].get("admin")]:
-        return jsonify({"success": False, "error": "Unauthorized"})
-    if using_pg:
-        rows = db_execall("SELECT * FROM logs ORDER BY id DESC LIMIT 100")
-    else:
-        with lock:
-            rows = get_db().execute("SELECT * FROM logs ORDER BY id DESC LIMIT 100").fetchall()
-    return jsonify({"success": True, "logs": [dict(r) if not isinstance(r, dict) else r for r in rows]})
-
 @app.route("/api/download", methods=["GET", "OPTIONS"])
 def api_download():
     if request.method == "OPTIONS":
@@ -938,492 +1309,19 @@ def api_admin_announce():
     log_action("announce", admin, msg[:50], request.remote_addr)
     return jsonify({"success": True})
 
-# ========== SALES (merged from messaging_bot) ==========
-
-ROSA = 0xDB00A6
-BANNER = "https://i.imgur.com/DSxv3VU.png"
-
-PLANOS = {
-    "diario":   {"nome": "Diario",   "preco": 15,  "dias": 1,     "emoji": "\U0001f4a5"},
-    "semanal":  {"nome": "Semanal",  "preco": 50,  "dias": 7,     "emoji": "\U0001f550"},
-    "mensal":   {"nome": "Mensal",   "preco": 100, "dias": 30,    "emoji": "\U0001f4c5"},
-    "lifetime": {"nome": "Lifetime", "preco": 500, "dias": 36500, "emoji": "\u26a1"},
-    "basic":    {"nome": "Basic",    "preco": 50,  "dias": 15,    "emoji": "\U0001f539"},
-}
-
-async def enviar_key_dm(member: discord.Member, key: str, dias: int, plano_nome: str):
-    embed = discord.Embed(
-        title="\u2705 Pagamento Aprovado!",
-        color=discord.Color.green(),
-        description=(
-            f"**Sua key foi gerada:**\n"
-            f"```\n{key}\n```\n"
-            f"**Plano:** {plano_nome}\n"
-            f"**Duração:** {dias} dia(s)\n\n"
-            f"Use o loader para baixar o Satella.\n"
-            f"Obrigado pela preferência! \u2764"
-        )
-    )
-    embed.set_image(url=BANNER)
-    embed.set_footer(text="Satella Private")
-    try:
-        await member.send(embed=embed)
-        return True
-    except:
-        return False
-
-async def aprovar_pagamento(member: discord.Member, plan: str, txid: str = None):
-    info = PLANOS.get(plan)
-    if not info:
-        return None
-    dias = info["dias"]
-    k = gen_key()
-    try:
-        if using_pg:
-            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (%s, %s, %s)",
-                    (k, dias, now()))
-        else:
-            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (?, ?, ?)",
-                    (k, dias, now()))
-            db_commit()
-    except Exception as e:
-        print(f"[SALES] Erro ao inserir key: {e}")
-        return None
-    if txid:
-        try:
-            if using_pg:
-                db_exec("UPDATE pix_pending SET status = 'paid' WHERE txid = %s", (txid,))
-            else:
-                db_exec("UPDATE pix_pending SET status = 'paid' WHERE txid = ?", (txid,))
-                db_commit()
-        except:
-            pass
-    role_id = CONFIG.get("client_role_id", 0)
-    if role_id and isinstance(member, discord.Member):
-        role = member.guild.get_role(role_id)
-        if role:
-            try:
-                await member.add_roles(role)
-            except:
-                pass
-    await enviar_key_dm(member, k, dias, info["nome"])
-    await log_action(f"APROVADO: {member} ({member.id}) plano={plan} key={k}")
-    return k
-
-class PainelView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Adquirir", style=discord.ButtonStyle.success, emoji="\U0001f6d2")
-    async def adquirir(self, i: discord.Interaction, b: discord.ui.Button):
-        await i.response.send_message("Selecione o plano desejado:", view=PlanSelect(), ephemeral=True)
-
-class PlanSelect(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.select(placeholder="Escolha seu plano...", options=[
-        discord.SelectOption(label="Basic - R$50", description="15 dias de acesso", value="basic", emoji="\U0001f539"),
-        discord.SelectOption(label="Diario - R$15", description="1 dia de acesso", value="diario", emoji="\U0001f4a5"),
-        discord.SelectOption(label="Semanal - R$50", description="7 dias de acesso", value="semanal", emoji="\U0001f550"),
-        discord.SelectOption(label="Mensal - R$100", description="30 dias de acesso", value="mensal", emoji="\U0001f4c5"),
-        discord.SelectOption(label="Lifetime - R$500", description="Acesso vitalicio", value="lifetime", emoji="\u26a1"),
-    ])
-    async def select_plan(self, i: discord.Interaction, s: discord.ui.Select):
-        info = PLANOS.get(s.values[0])
-        if not info:
-            return await i.response.send_message("Plano invalido.", ephemeral=True)
-        txid = secrets.token_hex(8)
-        valor = info["preco"]
-        chave = CONFIG.get("pix_key", "")
-        if not chave:
-            return await i.response.send_message("PIX nao configurado.", ephemeral=True)
-        nome = CONFIG.get("pix_name", "Satella")
-        brcode = gerar_pix_brcode(chave, valor, nome, txid=txid)
-        qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={brcode}"
-        try:
-            if using_pg:
-                db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (%s, %s, %s, 'pending', %s)",
-                        (txid, str(i.user.id), s.values[0], now()))
-            else:
-                db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                        (txid, str(i.user.id), s.values[0], now()))
-                db_commit()
-        except:
-            try:
-                if not using_pg:
-                    db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER)")
-                    db_commit()
-                    db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                            (txid, str(i.user.id), s.values[0], now()))
-                    db_commit()
-            except Exception as e:
-                return await i.response.send_message(f"Erro: {e}", ephemeral=True)
-        embed = discord.Embed(
-            title=f"\U0001f4b0 Carrinho - {info['nome']}",
-            color=ROSA,
-            description=(
-                f"**Plano:** {info['emoji']} {info['nome']}\n"
-                f"**Valor:** R$ **{valor:.2f}**\n\n"
-                f"\U0001f449 **Pague via PIX**\n\n"
-                f"**Chave:** `{chave}`\n"
-                f"**Nome:** {nome}\n\n"
-                f"Pague o valor exato de **R$ {valor:.2f}**\n"
-                f"Depois clique em **\"Já paguei!\"** abaixo."
-            )
-        )
-        embed.set_image(url=qr_url)
-        embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
-        view = ComprovanteView(txid, s.values[0])
-        try:
-            await i.user.send(embed=embed, view=view)
-            await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
-        except discord.Forbidden:
-            await i.response.send_message(
-                f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
-                f"**Chave PIX:** `{chave}`\n"
-                f"**Valor:** R$ {valor:.2f}\n"
-                f"**QR Code:** {qr_url}",
-                ephemeral=True)
-
-class ComprovanteModal(discord.ui.Modal, title="Enviar Comprovante"):
-    def __init__(self, txid: str, plan: str):
-        super().__init__()
-        self.txid = txid
-        self.plan = plan
-        self.add_item(discord.ui.TextInput(
-            label="Link do comprovante",
-            placeholder="Cole o link da imagem (imgur, discord, etc)",
-            style=discord.TextStyle.short,
-            required=True,
-        ))
-
-    async def on_submit(self, i: discord.Interaction):
-        link = self.children[0].value.strip()
-        embed_comprovante = discord.Embed(
-            title="\U0001f4e9 Comprovante Recebido",
-            color=discord.Color.green(),
-            description="Seu comprovante foi enviado para aprovação. Aguarde.",
-        )
-        embed_comprovante.set_image(url=link)
-        embed_comprovante.set_footer(text="Aguardando aprovacao do admin")
-        await i.response.send_message(embed=embed_comprovante)
-        admin_log = discord.Embed(
-            title="\U0001f4e9 Novo Comprovante",
-            color=ROSA,
-            description=(
-                f"**Comprador:** {i.user.mention} (`{i.user.id}`)\n"
-                f"**Plano:** {self.plan}\n"
-                f"**TxID:** `{self.txid}`\n"
-                f"**Comprovante:** [Clique aqui]({link})"
-            )
-        )
-        admin_log.set_image(url=link)
-        log_id = CONFIG.get("log_channel_id")
-        if log_id:
-            ch = bot.get_channel(log_id)
-            if ch:
-                await ch.send(
-                    embed=admin_log,
-                    content=" ".join(f"<@{uid}>" for uid in CONFIG.get("admin_ids", []) if uid),
-                    view=AdminApproveView(self.txid, self.plan, i.user.id)
-                )
-
-class ComprovanteView(discord.ui.View):
-    def __init__(self, txid: str = "", plan: str = ""):
-        super().__init__(timeout=None)
-        self.txid = txid
-        self.plan = plan
-
-    @discord.ui.button(label="Ja paguei!", style=discord.ButtonStyle.success, emoji="\u2705")
-    async def ja_paguei(self, i: discord.Interaction, b: discord.ui.Button):
-        modal = ComprovanteModal(self.txid, self.plan)
-        await i.response.send_modal(modal)
-
-class AdminApproveView(discord.ui.View):
-    def __init__(self, txid: str = "", plan: str = "", user_id: int = 0):
-        super().__init__(timeout=None)
-        self.txid = txid
-        self.plan = plan
-        self.user_id = user_id
-
-    @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.success, emoji="\u2705")
-    async def approve_btn(self, i: discord.Interaction, b: discord.ui.Button):
-        if i.user.id not in CONFIG.get("admin_ids", []):
-            return await i.response.send_message("Sem permissao.", ephemeral=True)
-        member = i.guild.get_member(self.user_id)
-        if not member:
-            return await i.response.send_message("Usuario nao encontrado no servidor.", ephemeral=True)
-        await i.response.defer(ephemeral=True)
-        k = await aprovar_pagamento(member, self.plan, self.txid)
-        if k:
-            embed = discord.Embed(title="\u2705 Pagamento Aprovado", color=discord.Color.green(),
-                description=f"**Admin:** {i.user.mention}\n**Comprador:** <@{self.user_id}>\n**Key:** `{k}`\n\n\U0001f4e5 Key enviada no PV.")
-            await i.channel.send(embed=embed)
-            await i.followup.send("Pagamento aprovado com sucesso!", ephemeral=True)
-            for child in self.children:
-                child.disabled = True
-            await i.message.edit(view=self)
-        else:
-            await i.followup.send("Erro ao aprovar pagamento.", ephemeral=True)
-
-    @discord.ui.button(label="Negar", style=discord.ButtonStyle.danger, emoji="\u274c")
-    async def deny_btn(self, i: discord.Interaction, b: discord.ui.Button):
-        if i.user.id not in CONFIG.get("admin_ids", []):
-            return await i.response.send_message("Sem permissao.", ephemeral=True)
-        try:
-            if using_pg:
-                db_exec("UPDATE pix_pending SET status = 'denied' WHERE txid = %s", (self.txid,))
-            else:
-                db_exec("UPDATE pix_pending SET status = 'denied' WHERE txid = ?", (self.txid,))
-                db_commit()
-        except:
-            pass
-        member = i.guild.get_member(self.user_id)
-        if member:
-            try:
-                await member.send("\u274c Seu pagamento foi recusado. Contacte o suporte.")
-            except:
-                pass
-        embed = discord.Embed(title="\u274c Pagamento Recusado", color=discord.Color.red(),
-            description=f"**Admin:** {i.user.mention}\n**Comprador:** <@{self.user_id}>")
-        await i.channel.send(embed=embed)
-        await i.response.send_message("Pagamento recusado.", ephemeral=True)
-        for child in self.children:
-            child.disabled = True
-        await i.message.edit(view=self)
-
-class PrivateGroup(app_commands.Group):
-    pass
-
-private_group = PrivateGroup(name="private", description="Comandos do Private")
-
-@private_group.command(name="painel", description="Enviar painel Private")
-async def cmd_private_painel(i: discord.Interaction):
-    if not is_admin(i):
-        return await i.response.send_message("Sem permissao.", ephemeral=True)
-    embed = discord.Embed(
-        title="\U0001f451 Satella Private",
-        color=ROSA,
-        description=(
-            "\U0001f451 **SATELLA PRIVATE — O MELHOR CHEAT DO FREE FIRE!** \U0001f451\n\n"
-            "\U0001f6e1 **Totalmente Indetectável:** Passe batido por qualquer anti-cheat \u2705\n"
-            "\u26a1 **Bypass Absoluto:** O melhor bypass do mercado, nada te para \ud83d\udd25\n"
-            "\U0001f3af **Faça de Tudo:** Aimbot, Visual, Wallhack, tudo que você precisa \U0001f4f1\n"
-            "\u274c **Não Cai em Apostados:** Zero ban, mesmo nos apostados mais pesados \U0001f6ab\n"
-            "\U0001f4bb **Leve e Rápido:** Roda em qualquer PC sem lags \U0001f680\n"
-            "\U0001f512 **Atualização Constante:** Sempre atualizado pra você nunca ficar na mão \U0001f504\n\n"
-            "\U0001f447 **ADQUIRA JÁ E DOMINE O JOGO!** \U0001f447"
-        )
-    )
-    embed.set_image(url=BANNER)
-    embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
-        "\U0001f539 **Basic** — R$50,00 *(15 dias)*\n"
-        "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
-        "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
-        "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
-        "\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*"
-    ), inline=False)
-    embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
-    await i.channel.send(embed=embed, view=PainelView())
-    await i.response.send_message("Painel Private postado!", ephemeral=True)
-
-@private_group.command(name="basic", description="Comprar plano Basic - R$50 (15 dias)")
-async def cmd_private_basic(i: discord.Interaction):
-    info = PLANOS.get("basic")
-    txid = secrets.token_hex(8)
-    valor = info["preco"]
-    chave = CONFIG.get("pix_key", "")
-    if not chave:
-        return await i.response.send_message("PIX nao configurado. Contacte o admin.", ephemeral=True)
-    nome = CONFIG.get("pix_name", "Satella")
-    brcode = gerar_pix_brcode(chave, valor, nome, txid=txid)
-    qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={brcode}"
-    try:
-        if using_pg:
-            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (%s, %s, %s, 'pending', %s)",
-                    (txid, str(i.user.id), "basic", now()))
-        else:
-            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                    (txid, str(i.user.id), "basic", now()))
-            db_commit()
-    except:
-        try:
-            if not using_pg:
-                db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER)")
-                db_commit()
-                db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                        (txid, str(i.user.id), "basic", now()))
-                db_commit()
-        except Exception as e:
-            return await i.response.send_message(f"Erro ao criar pagamento: {e}", ephemeral=True)
-    embed = discord.Embed(
-        title=f"\U0001f4b0 Carrinho - Basic",
-        color=ROSA,
-        description=(
-            f"**Plano:** \U0001f539 Basic\n"
-            f"**Valor:** R$ **{valor:.2f}**\n"
-            f"**Duração:** 15 dias\n\n"
-            f"\U0001f449 **Pague via PIX**\n\n"
-            f"**Chave:** `{chave}`\n"
-            f"**Nome:** {nome}\n\n"
-            f"Pague o valor exato de **R$ {valor:.2f}**\n"
-            f"Depois clique em **\"Já paguei!\"** abaixo."
-        )
-    )
-    embed.set_image(url=qr_url)
-    embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
-    view = ComprovanteView(txid, "basic")
-    try:
-        await i.user.send(embed=embed, view=view)
-        await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
-    except discord.Forbidden:
-        await i.response.send_message(
-            f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
-            f"**Chave PIX:** `{chave}`\n"
-            f"**Valor:** R$ {valor:.2f}\n"
-            f"**QR Code:** {qr_url}",
-            ephemeral=True)
-
-bot.tree.add_command(private_group)
-
-@bot.tree.command(name="painel", description="Enviar painel de vendas")
-async def cmd_painel(i: discord.Interaction):
-    if not is_admin(i):
-        return await i.response.send_message("Sem permissao.", ephemeral=True)
-    embed = discord.Embed(
-        title="\U0001f48e Satella Private",
-        color=ROSA,
-        description=(
-            "\u26a1 **O MELHOR BYPASS DO MERCADO!** \u26a1\n\n"
-            "\U0001f6e1 **Anti-Detect:** Não cai em apostados \u274c\n"
-            "\U0001f3af **Legit Perfeito:** Suave e preciso \U0001f4af\n"
-            "\U0001f680 **Otimizado:** Roda liso em qualquer PC \U0001f4bb\n"
-            "\U0001f512 **Seguro:** Atualização constante \U0001f504\n"
-            "\U0001f525 **Bypass potente:** Passe batido pelos anti-cheats \ud83d\udcaa\n\n"
-            "\U0001f447 **Garanta já o seu acesso e domine o jogo!** \U0001f447"
-        )
-    )
-    embed.set_image(url=BANNER)
-    embed.add_field(name="\U0001f4b0 Planos Disponiveis", value=(
-        "\U0001f4a5 **Diario** — R$15,00 *(1 dia)*\n"
-        "\U0001f550 **Semanal** — R$50,00 *(7 dias)*\n"
-        "\U0001f4c5 **Mensal** — R$100,00 *(30 dias)*\n"
-        "\u26a1 **Lifetime** — R$500,00 *(Vitalicio)*"
-    ), inline=False)
-    embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
-    await i.channel.send(embed=embed, view=PainelView())
-    await i.response.send_message("Painel postado!", ephemeral=True)
-
-@bot.tree.command(name="comprar", description="Iniciar processo de compra")
-@app_commands.describe(plano="Plano desejado")
-@app_commands.choices(plano=[
-    app_commands.Choice(name="Basic - R$50 (15 dias)", value="basic"),
-    app_commands.Choice(name="Diario - R$15 (1 dia)", value="diario"),
-    app_commands.Choice(name="Semanal - R$50 (7 dias)", value="semanal"),
-    app_commands.Choice(name="Mensal - R$100 (30 dias)", value="mensal"),
-    app_commands.Choice(name="Lifetime - R$500 (Vitalicio)", value="lifetime"),
-])
-async def cmd_comprar(i: discord.Interaction, plano: str):
-    info = PLANOS.get(plano)
-    if not info:
-        return await i.response.send_message("Plano invalido.", ephemeral=True)
-    txid = secrets.token_hex(8)
-    valor = info["preco"]
-    chave = CONFIG.get("pix_key", "")
-    if not chave:
-        return await i.response.send_message("PIX nao configurado. Contacte o admin.", ephemeral=True)
-    nome = CONFIG.get("pix_name", "Satella")
-    brcode = gerar_pix_brcode(chave, valor, nome, txid=txid)
-    qr_url = f"https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl={brcode}"
-    try:
-        if using_pg:
-            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (%s, %s, %s, 'pending', %s)",
-                    (txid, str(i.user.id), plano, now()))
-        else:
-            db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                    (txid, str(i.user.id), plano, now()))
-            db_commit()
-    except:
-        try:
-            if not using_pg:
-                db_exec("CREATE TABLE IF NOT EXISTS pix_pending (id INTEGER PRIMARY KEY AUTOINCREMENT, txid TEXT UNIQUE, user_id TEXT, plan TEXT, status TEXT DEFAULT 'pending', created_at INTEGER)")
-                db_commit()
-                db_exec("INSERT INTO pix_pending (txid, user_id, plan, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
-                        (txid, str(i.user.id), plano, now()))
-                db_commit()
-        except Exception as e:
-            return await i.response.send_message(f"Erro ao criar pagamento: {e}", ephemeral=True)
-    embed = discord.Embed(
-        title=f"\U0001f4b0 Carrinho - {info['nome']}",
-        color=ROSA,
-        description=(
-            f"**Plano:** {info['emoji']} {info['nome']}\n"
-            f"**Valor:** R$ **{valor:.2f}**\n\n"
-            f"\U0001f449 **Pague via PIX**\n\n"
-            f"**Chave:** `{chave}`\n"
-            f"**Nome:** {nome}\n\n"
-            f"Pague o valor exato de **R$ {valor:.2f}**\n"
-            f"Depois clique em **\"Já paguei!\"** abaixo."
-        )
-    )
-    embed.set_image(url=qr_url)
-    embed.set_footer(text=f"Satella Private • ID: {txid[:8]}...")
-    view = ComprovanteView(txid, plano)
-    try:
-        await i.user.send(embed=embed, view=view)
-        await i.response.send_message("\U0001f4e8 **Carrinho enviado no seu privado!** Verifique suas DMs.", ephemeral=True)
-    except discord.Forbidden:
-        await i.response.send_message(
-            f"\u274c Nao consegui enviar DM. Ative \"Permitir mensagens diretas\" no servidor.\n\n"
-            f"**Chave PIX:** `{chave}`\n"
-            f"**Valor:** R$ {valor:.2f}\n"
-            f"**QR Code:** {qr_url}",
-            ephemeral=True)
-
-@bot.tree.command(name="aprovar", description="Aprovar pagamento e entregar key")
-@app_commands.describe(usuario="Usuario do Discord")
-async def cmd_aprovar(i: discord.Interaction, usuario: discord.Member):
-    if not is_admin(i):
-        return await i.response.send_message("Sem permissao.", ephemeral=True)
-    row = db_execone(
-        "SELECT * FROM pix_pending WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1" if not using_pg else "SELECT * FROM pix_pending WHERE user_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1",
-        (str(usuario.id),)
-    )
-    if not row:
-        return await i.response.send_message("Nenhum pagamento pendente para este usuario.", ephemeral=True)
-    row = dict(row) if not isinstance(row, dict) else row
-    k = await aprovar_pagamento(usuario, row["plan"], row["txid"])
-    if k:
-        await i.response.send_message(f"\u2705 Pagamento aprovado! Key `{k}` enviada no PV de {usuario.mention}.", ephemeral=True)
+@app.route("/api/logs", methods=["GET"])
+def api_logs():
+    auth = request.headers.get("Authorization", "")
+    if auth not in [f"Bearer {t}" for t in tokens if tokens[t].get("admin")]:
+        return jsonify({"success": False, "error": "Unauthorized"})
+    if using_pg:
+        rows = db_execall("SELECT * FROM logs ORDER BY id DESC LIMIT 100")
     else:
-        await i.response.send_message("\u274c Erro ao aprovar.", ephemeral=True)
+        with lock:
+            rows = get_db().execute("SELECT * FROM logs ORDER BY id DESC LIMIT 100").fetchall()
+    return jsonify({"success": True, "logs": [dict(r) if not isinstance(r, dict) else r for r in rows]})
 
-@bot.tree.command(name="negar", description="Negar pagamento")
-@app_commands.describe(usuario="Usuario do Discord")
-async def cmd_negar(i: discord.Interaction, usuario: discord.Member):
-    if not is_admin(i):
-        return await i.response.send_message("Sem permissao.", ephemeral=True)
-    row = db_execone(
-        "SELECT * FROM pix_pending WHERE user_id = ? AND status = 'pending' ORDER BY id DESC LIMIT 1" if not using_pg else "SELECT * FROM pix_pending WHERE user_id = %s AND status = 'pending' ORDER BY id DESC LIMIT 1",
-        (str(usuario.id),)
-    )
-    if not row:
-        return await i.response.send_message("Nenhum pagamento pendente para este usuario.", ephemeral=True)
-    row = dict(row) if not isinstance(row, dict) else row
-    try:
-        if using_pg:
-            db_exec("UPDATE pix_pending SET status = 'denied' WHERE txid = %s", (row["txid"],))
-        else:
-            db_exec("UPDATE pix_pending SET status = 'denied' WHERE txid = ?", (row["txid"],))
-            db_commit()
-    except:
-        pass
-    try:
-        await usuario.send("\u274c Seu pagamento foi recusado. Contacte o suporte.")
-    except:
-        pass
-    await i.response.send_message(f"\u274c Pagamento de {usuario.mention} recusado.", ephemeral=True)
+# ========== RUN ==========
 
 def cleanup_tokens():
     while True:
@@ -1440,14 +1338,13 @@ def run_flask():
 def run_bot():
     token = CONFIG.get("token", "")
     if not token or token == "DISCORD_TOKEN_AQUI":
-        print("[BOT] Token não configurado! Configure DISCORD_TOKEN no Render.")
+        print("[BOT] Token nao configurado!")
         return
-    # Força criação de nova sessão HTTP (evita "Session is closed" em retry)
     bot.http._session = None
     bot.run(token)
 
 if __name__ == "__main__":
-    print("[AUTH] Iniciando sistema...")
+    print("[AUTH] Iniciando sistema unificado...")
     init_db()
     t1 = threading.Thread(target=run_flask, daemon=True)
     t1.start()
