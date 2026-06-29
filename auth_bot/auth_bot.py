@@ -341,11 +341,7 @@ ROSA = 0xDB00A6
 BANNER = "https://i.imgur.com/DSxv3VU.png"
 
 PLANOS = {
-    "basic":    {"nome": "Basic",    "preco": 50,  "dias": 15,   "emoji": "\U0001f539", "desc": "15 dias de acesso"},
-    "diario":   {"nome": "Diario",   "preco": 15,  "dias": 1,    "emoji": "\U0001f4a5", "desc": "1 dia de acesso"},
-    "semanal":  {"nome": "Semanal",  "preco": 50,  "dias": 7,    "emoji": "\U0001f550", "desc": "7 dias de acesso"},
-    "mensal":   {"nome": "Mensal",   "preco": 100, "dias": 30,   "emoji": "\U0001f4c5", "desc": "30 dias de acesso"},
-    "lifetime": {"nome": "Lifetime", "preco": 500, "dias": 36500,"emoji": "\u26a1",     "desc": "Acesso vitalicio"},
+    "public": {"nome": "Public", "preco": 75, "dias": 30, "emoji": "\U0001f539", "desc": "30 dias de acesso"},
 }
 
 # ========== DISCORD BOT ==========
@@ -490,18 +486,11 @@ async def postar_painel(channel, admin_user):
             "Public foi criado para entregar uma experi\u00eancia de alto n\u00edvel, combinando "
             "efici\u00eancia, exclusividade e uma estrutura premium projetada para operar acima dos "
             "padr\u00f5es convencionais.\n\n"
-            "- Pre\u00e7o: **R$ 250,00**\n"
+            "- Pre\u00e7o: **R$ 75,00**\n"
             "- Clique no bot\u00e3o **\"Comprar\"**"
         )
     )
-    embed.add_field(name="Planos", value=(
-        "\U0001f539 Basic — R$50 (15 dias)\n"
-        "\U0001f4a5 Diario — R$15 (1 dia)\n"
-        "\U0001f550 Semanal — R$50 (7 dias)\n"
-        "\U0001f4c5 Mensal — R$100 (30 dias)\n"
-        "\u26a1 Lifetime — R$500 (Vitalicio)"
-    ), inline=False)
-    embed.set_footer(text="Satella Private", icon_url=bot.user.display_avatar.url if bot.user else None)
+    embed.set_footer(text="Satella Public", icon_url=bot.user.display_avatar.url if bot.user else None)
     await channel.send(embed=embed, view=MainPanel())
 
 @bot.tree.command(name="painel", description="Postar o painel de vendas")
@@ -518,20 +507,10 @@ async def cmd_painelpriv(i: discord.Interaction):
     await postar_painel(i.channel, i.user)
     await i.response.send_message("Painel Private postado!", ephemeral=True)
 
-@bot.tree.command(name="comprar", description="Iniciar processo de compra")
-@app_commands.describe(plano="Plano desejado")
-@app_commands.choices(plano=[
-    app_commands.Choice(name="Basic - R$50 (15 dias)", value="basic"),
-    app_commands.Choice(name="Diario - R$15 (1 dia)", value="diario"),
-    app_commands.Choice(name="Semanal - R$50 (7 dias)", value="semanal"),
-    app_commands.Choice(name="Mensal - R$100 (30 dias)", value="mensal"),
-    app_commands.Choice(name="Lifetime - R$500 (Vitalicio)", value="lifetime"),
-])
-async def cmd_comprar(i: discord.Interaction, plano: str):
-    info = PLANOS.get(plano)
-    if not info:
-        return await i.response.send_message("Plano invalido.", ephemeral=True)
-    await iniciar_checkout(i, plano, info)
+@bot.tree.command(name="comprar", description="Comprar Satella Public")
+async def cmd_comprar(i: discord.Interaction):
+    info = PLANOS.get("public")
+    await iniciar_checkout(i, "public", info)
 
 async def iniciar_checkout(i: discord.Interaction, plano_key: str, info: dict):
     valor_centavos = int(info["preco"] * 100)

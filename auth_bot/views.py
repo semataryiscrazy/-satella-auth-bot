@@ -5,11 +5,7 @@ ROSA = 0xDB00A6
 BANNER = "https://i.imgur.com/DSxv3VU.png"
 
 PLANOS_OPCOES = [
-    discord.SelectOption(label="Basic - R$50", description="15 dias de acesso", value="basic", emoji="\U0001f539"),
-    discord.SelectOption(label="Diario - R$15", description="1 dia de acesso", value="diario", emoji="\U0001f4a5"),
-    discord.SelectOption(label="Semanal - R$50", description="7 dias de acesso", value="semanal", emoji="\U0001f550"),
-    discord.SelectOption(label="Mensal - R$100", description="30 dias de acesso", value="mensal", emoji="\U0001f4c5"),
-    discord.SelectOption(label="Lifetime - R$500", description="Acesso vitalicio", value="lifetime", emoji="\u26a1"),
+    discord.SelectOption(label="Public - R$75", description="30 dias de acesso", value="public", emoji="\U0001f539"),
 ]
 
 class MainPanel(discord.ui.View):
