@@ -472,15 +472,26 @@ async def on_member_join(member: discord.Member):
 async def postar_painel(channel, admin_user):
     from views import MainPanel
     embed = discord.Embed(
-        title="Satella Private",
+        title="Satella Public",
         color=ROSA,
         description=(
-            "**O MELHOR BYPASS DO FREE FIRE!**\n\n"
-            "Bypass absoluto, passa em telagem de apostados.\n"
-            "Aimbot, Visual, Wallhack, Mira em osso, Anti-recuo.\n"
-            "Indetectavel, roda em qualquer PC.\n"
-            "Atualizacao constante, zero ban.\n\n"
-            "**Adquira ja e domine o jogo!**"
+            "O Satella Public foi desenvolvido para oferecer um equil\u00edbrio "
+            "ideal entre desempenho, seguran\u00e7a e discri\u00e7\u00e3o. Criado para usu\u00e1rios que "
+            "buscam uma experi\u00eancia mais est\u00e1vel e protegida, o sistema utiliza m\u00e9todos "
+            "otimizados capazes de manter efici\u00eancia mesmo durante an\u00e1lises e verifica\u00e7\u00f5es "
+            "mais avan\u00e7adas. Sua estrutura foi planejada para garantir um funcionamento leve, "
+            "seguro e bem ajustado, proporcionando estabilidade e praticidade durante o uso. O Satella "
+            "Public combina prote\u00e7\u00e3o, desempenho e otimiza\u00e7\u00e3o em uma solu\u00e7\u00e3o "
+            "confi\u00e1vel e eficiente.\n\n"
+            "O conjunto de todo o sistema foi desenvolvido com foco "
+            "absoluto em seguran\u00e7a, desempenho e discri\u00e7\u00e3o, utilizando tecnologias "
+            "avan\u00e7adas de prote\u00e7\u00e3o e m\u00e9todos sofisticados de bypass capazes de "
+            "manter m\u00e1xima estabilidade mesmo sob an\u00e1lises extremamente rigorosas. O Satella "
+            "Public foi criado para entregar uma experi\u00eancia de alto n\u00edvel, combinando "
+            "efici\u00eancia, exclusividade e uma estrutura premium projetada para operar acima dos "
+            "padr\u00f5es convencionais.\n\n"
+            "- Pre\u00e7o: **R$ 250,00**\n"
+            "- Clique no bot\u00e3o **\"Comprar\"**"
         )
     )
     embed.add_field(name="Planos", value=(

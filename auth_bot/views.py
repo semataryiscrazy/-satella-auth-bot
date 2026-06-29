@@ -16,7 +16,7 @@ class MainPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Adquirir", style=discord.ButtonStyle.success, custom_id="main_adquirir", emoji="\U0001f6d2")
+    @discord.ui.button(label="Comprar", style=discord.ButtonStyle.success, custom_id="main_adquirir", emoji="\U0001f6d2")
     async def adquirir(self, i: discord.Interaction, b: discord.ui.Button):
         await i.response.send_message("Selecione o plano desejado:", view=PlanSelect(), ephemeral=True)
 
