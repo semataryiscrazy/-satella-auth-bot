@@ -218,32 +218,27 @@ def db_exec(sql, params=None):
     if using_pg:
         sql = sql.replace("?", "%s")
         sql = re.sub(r'INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY', sql, flags=re.IGNORECASE)
-        if sql.strip().upper().startswith("ALTER"):
+        with lock:
             try:
                 with db.cursor() as cur:
-                    cur.execute(sql.replace("?", "%s") if params else sql, params or ())
-                return True
-            except:
-                return False
-        try:
-            with db.cursor() as cur:
-                cur.execute(sql, params or ())
-                try:
-                    rows = cur.fetchall()
-                    return [dict(r) for r in rows]
-                except:
+                    cur.execute(sql, params or ())
+                    is_select = sql.strip().upper().startswith("SELECT")
+                    if is_select:
+                        rows = cur.fetchall()
+                        return [dict(r) for r in rows]
                     return []
-        except Exception as e:
-            print(f"[DB] PG error: {e}")
-            return []
+            except Exception as e:
+                print(f"[DB] PG error: {e}")
+                raise
     else:
-        try:
-            if params:
-                return db.execute(sql, params)
-            return db.execute(sql)
-        except Exception as e:
-            print(f"[DB] SQLite error: {e}")
-            raise
+        with lock:
+            try:
+                if params:
+                    return db.execute(sql, params)
+                return db.execute(sql)
+            except Exception as e:
+                print(f"[DB] SQLite error: {e}")
+                raise
 
 def db_execone(sql, params=None):
     rows = db_exec(sql, params)
@@ -946,17 +941,21 @@ def api_admin_keys_generate():
     if days < 0 or days > 3650:
         return jsonify({"success": False, "error": "Dias entre 0 e 3650"})
     created = []
-    for _ in range(qty):
-        k = gen_key()
-        if using_pg:
-            db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (%s, %s, %s)", (k, days, now()))
-        else:
-            get_db().execute("INSERT INTO keys (key, duration_days, created_at) VALUES (?, ?, ?)", (k, days, now()))
-        created.append(k)
-    if not using_pg:
-        get_db().commit()
-    log_action("admin_genkey", admin, f"{qty}x {days}d", request.remote_addr)
-    return jsonify({"success": True, "keys": created, "quantity": qty})
+    try:
+        for _ in range(qty):
+            k = gen_key()
+            if using_pg:
+                db_exec("INSERT INTO keys (key, duration_days, created_at) VALUES (%s, %s, %s)", (k, days, now()))
+            else:
+                get_db().execute("INSERT INTO keys (key, duration_days, created_at) VALUES (?, ?, ?)", (k, days, now()))
+            created.append(k)
+        if not using_pg:
+            get_db().commit()
+        log_action("admin_genkey", admin, f"{qty}x {days}d", request.remote_addr)
+        return jsonify({"success": True, "keys": created, "quantity": qty})
+    except Exception as e:
+        print(f"[KEYS] Erro ao gerar keys: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
 @app.route("/api/admin/keys/add", methods=["POST", "OPTIONS"])
 def api_admin_keys_add():
