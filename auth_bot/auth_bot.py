@@ -476,9 +476,10 @@ async def postar_painel(channel, admin_user):
         color=ROSA,
         description=(
             "**O MELHOR BYPASS DO FREE FIRE!**\n\n"
-            "Bypass absouto, indetectavel, roda em qualquer PC.\n"
-            "Aimbot, Visual, Wallhack e muito mais.\n"
-            "Atualizacao constante, zero ban em apostados.\n\n"
+            "Bypass absoluto, passa em telagem de apostados.\n"
+            "Aimbot, Visual, Wallhack, Mira em osso, Anti-recuo.\n"
+            "Indetectavel, roda em qualquer PC.\n"
+            "Atualizacao constante, zero ban.\n\n"
             "**Adquira ja e domine o jogo!**"
         )
     )
