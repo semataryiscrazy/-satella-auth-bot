@@ -74,12 +74,10 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <CopyCppRuntimeToOutputDir>false</CopyCppRuntimeToOutputDir>
-    <IncludePath>$(ProjectDir)source\Cfg\Discord\Discord SDK;$(IncludePath)</IncludePath>
     <TargetName>Satella</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <CopyCppRuntimeToOutputDir>false</CopyCppRuntimeToOutputDir>
-    <IncludePath>$(ProjectDir)source\Cfg\Discord\Discord SDK;$(IncludePath)</IncludePath>
     <TargetName>Satellax86</TargetName>
     <OutDir>$(SolutionDir)x86\Release\</OutDir>
     <IntDir>$(SolutionDir)x86\Release\Int\</IntDir>
@@ -168,7 +166,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>source\Cfg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Shlwapi.lib;Ws2_32.lib;libcurl_a.lib;d3d11.lib;d3dcompiler.lib;dxgi.lib;wbemuuid.lib;Crypt32.lib;Wldap32.lib;Normaliz.lib;opengl32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shlwapi.lib;Ws2_32.lib;d3d11.lib;d3dcompiler.lib;dxgi.lib;wbemuuid.lib;Crypt32.lib;Wldap32.lib;Normaliz.lib;opengl32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
     </Link>
   <PreBuildEvent>
@@ -176,7 +174,6 @@
 </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="source\Cfg\Discord\Discord.cpp" />
     <ClCompile Include="source\Cfg\encrypt.cpp" />
     <ClCompile Include="source\Cfg\imgui\imgui.cpp" />
     <ClCompile Include="source\Cfg\imgui\imgui_draw.cpp" />
@@ -242,7 +239,7 @@
     <ClInclude Include="Internal\AimbotInternal.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="source\Cfg\lib\libcurl_a.lib" />
+
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

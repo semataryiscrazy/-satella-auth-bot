@@ -39,7 +39,7 @@ namespace _0xW3X4Y5Z6 {
 
             Vector3 targetPos;
             {
-                WinLockGuard lock(GetCacheWriteMutex());
+                WinSharedReadLockGuard lock(GetCacheMutex());
                 auto& cache = GetEntityCache();
                 auto it = cache.find((uintptr_t)tg);
                 if (it == cache.end() || !it->second.valid)

@@ -15,13 +15,10 @@
 #include <string>
 #include <vector>
 #include <functional>
-#define CURL_STATICLIB
-#include <curl/curl.h>
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
-#include "Discord/Discord.h"
 #include "strenc.h"
 #include "encrypt.hh"
 #include "http.h"

@@ -82,7 +82,6 @@ namespace LockAim {
 
             uint32_t cr = Ler<uint32_t>((uint32_t)laa);
             if (cr != hc) {
-                Escrever<uint32_t>((uint32_t)laa, 0u);
                 Escrever<uint32_t>((uint32_t)laa, hc);
             }
 

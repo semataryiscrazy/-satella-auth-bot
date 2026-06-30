@@ -8,8 +8,7 @@
 namespace ImGui {} // ensure namespace exists before using directive
 using namespace ImGui;
 
-class Discord;
-inline Discord* DiscordRPC;
+
 
 // ─── Win32 threading primitives (replaces <mutex>, <thread>, <shared_mutex>) ───
 
@@ -140,7 +139,7 @@ inline float LegitAimPredictionAmount = 1.5f;
 inline int LegitAimHitbox = 0; // 0=Body, 1=Head, 2=Neck, 3=Chest
 
 // === NOVO AIMBOT (Configuravel) ===
-inline bool AimbotLegit = true;
+inline bool AimbotLegit = false;
 inline int AimbotKeyBind = 0;
 inline int AimbotMaxDistance = 200;
 inline bool AimbotIgnoreKnocked = false;

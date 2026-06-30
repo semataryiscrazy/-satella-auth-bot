@@ -1,6 +1,6 @@
 #pragma once
 
-uint32_t TypeDefIndex(uintptr_t address) {
+inline uint32_t TypeDefIndex(uintptr_t address) {
     uintptr_t inputPtr = Ler<uintptr_t>(address);
     if (inputPtr == 0) return 0;
     return Ler<uint32_t>(inputPtr + string2Offset(AY_OBFUSCATE("0xA4")));
