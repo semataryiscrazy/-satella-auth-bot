@@ -53,3 +53,5 @@ Novo(a)*
 *.rar
 *.zip
 auth_bot/config.json
+auth_bot/__pycache__/
+__pycache__/
