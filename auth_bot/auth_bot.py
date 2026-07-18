@@ -194,7 +194,19 @@ except ImportError:
 def get_db():
     global DB, using_pg
     if DB is not None:
-        return DB
+        if using_pg:
+            try:
+                DB.cursor()
+                return DB
+            except Exception:
+                print("[DB] PostgreSQL connection stale, reconnecting...")
+                try:
+                    DB.close()
+                except Exception:
+                    pass
+                DB = None
+        else:
+            return DB
     db_path = CONFIG["db_path"]
     if db_path and db_path.startswith("postgres") and PSYCOPG2_AVAILABLE:
         try:
