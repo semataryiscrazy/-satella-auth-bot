@@ -1353,5 +1353,13 @@ if __name__ == "__main__":
     t2.start()
     import time as _time
     _time.sleep(2)
-    print("[BOT] Conectando ao Discord...")
-    run_bot()
+    while True:
+        try:
+            print("[BOT] Conectando ao Discord...")
+            run_bot()
+        except Exception as e:
+            import traceback
+            print(f"[BOT] Erro ao conectar Discord: {e}")
+            traceback.print_exc()
+        print("[BOT] Desconectou, reconectando em 15s...")
+        _time.sleep(15)
