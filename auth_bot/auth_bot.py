@@ -1250,6 +1250,60 @@ def api_register():
     log_action("register_ok", username, f"key:{key[:8]}... {key_row['duration_days']}d", request.remote_addr)
     return jsonify({"success": True, "token": token, "username": username, "expires_in_days": key_row["duration_days"]})
 
+@app.route("/api/auth", methods=["POST", "OPTIONS"])
+def api_auth():
+    if request.method == "OPTIONS":
+        return jsonify({"success": True})
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    key = data.get("key", "").strip()
+    hwid = data.get("hwid", "").strip()
+    if not username or not password:
+        return jsonify({"success": False, "error": "Username e senha obrigatorios"})
+    r = db_execone("SELECT * FROM users WHERE username = %s" if using_pg else "SELECT * FROM users WHERE username = ?", (username,))
+    if r:
+        r = convert_row(r)
+        if r["banned"]:
+            return jsonify({"success": False, "error": "Usuario banido"})
+        if r["password_hash"] != hash_pw(password):
+            return jsonify({"success": False, "error": "Senha incorreta"})
+        if r["expires_at"] < now():
+            return jsonify({"success": False, "error": "Subscription expirada"})
+        if r["hwid"] and r["hwid"] != hwid:
+            return jsonify({"success": False, "error": "HWID nao corresponde"})
+        if not r["hwid"] and hwid:
+            if using_pg:
+                db_exec("UPDATE users SET hwid = %s WHERE username = %s", (hwid, username))
+            else:
+                get_db().execute("UPDATE users SET hwid = ? WHERE username = ?", (hwid, username))
+                get_db().commit()
+        token = make_token()
+        tokens[token] = {"username": username, "expires_at": r["expires_at"], "created": now()}
+        return jsonify({"success": True, "token": token, "username": username, "expires_at": r["expires_at"], "expires_in_days": max(0, (r["expires_at"] - now()) // 86400)})
+    if not key:
+        return jsonify({"success": False, "error": "Key obrigatoria para novo usuario"})
+    key_up = key.upper().strip()
+    key_row = db_execone("SELECT * FROM keys WHERE key = %s AND used_by IS NULL" if using_pg else "SELECT * FROM keys WHERE key = ? AND used_by IS NULL", (key_up,))
+    if not key_row:
+        return jsonify({"success": False, "error": "Chave invalida ou ja usada"})
+    key_row = convert_row(key_row)
+    try:
+        if using_pg:
+            db_exec("INSERT INTO users (username, password_hash, hwid, created_at, expires_at) VALUES (%s, %s, %s, %s, %s)", (username, hash_pw(password), hwid, now(), now() + key_row["duration_days"] * 86400))
+            db_exec("UPDATE keys SET used_by = %s, used_at = %s WHERE key = %s", (username, now(), key_row["key"]))
+        else:
+            get_db().execute("INSERT INTO users (username, password_hash, hwid, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", (username, hash_pw(password), hwid, now(), now() + key_row["duration_days"] * 86400))
+            get_db().execute("UPDATE keys SET used_by = ?, used_at = ? WHERE key = ?", (username, now(), key_row["key"]))
+            get_db().commit()
+    except Exception as e:
+        if "UNIQUE" in str(e) or "duplicate" in str(e):
+            return jsonify({"success": False, "error": "Username ja existe"})
+        return jsonify({"success": False, "error": str(e)})
+    token = make_token()
+    tokens[token] = {"username": username, "expires_at": now() + key_row["duration_days"] * 86400, "created": now()}
+    return jsonify({"success": True, "token": token, "username": username, "expires_in_days": key_row["duration_days"]})
+
 @app.route("/api/verify", methods=["POST", "OPTIONS"])
 def api_verify():
     data = request.get_json() or {}
