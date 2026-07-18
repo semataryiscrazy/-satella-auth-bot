@@ -342,6 +342,20 @@ PLANOS = {
 # ========== DISCORD BOT ==========
 
 tokens = {}
+login_attempts = {}
+RATE_LIMIT_MAX = 3
+RATE_LIMIT_WINDOW = 60
+
+def is_rate_limited(ip):
+    t = now()
+    if ip not in login_attempts:
+        login_attempts[ip] = []
+    login_attempts[ip] = [ts for ts in login_attempts[ip] if t - ts < RATE_LIMIT_WINDOW]
+    if len(login_attempts[ip]) >= RATE_LIMIT_MAX:
+        return True
+    login_attempts[ip].append(t)
+    return False
+
 intents = discord.Intents.default()
 intents.message_content = False
 intents.members = True
@@ -1155,6 +1169,8 @@ def api_login():
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
     hwid = data.get("hwid", "").strip()
+    if is_rate_limited(request.remote_addr):
+        return jsonify({"success": False, "error": "Muitas tentativas. Aguarde 60 segundos."}), 429
     if not username or not password:
         return jsonify({"success": False, "error": "Username e senha obrigat\u00f3rios"})
     r = db_execone("SELECT * FROM users WHERE username = %s" if using_pg else "SELECT * FROM users WHERE username = ?", (username,))
@@ -1191,6 +1207,8 @@ def api_register():
     password = data.get("password", "").strip()
     key = data.get("key", "").strip()
     hwid = data.get("hwid", "").strip()
+    if is_rate_limited(request.remote_addr):
+        return jsonify({"success": False, "error": "Muitas tentativas. Aguarde 60 segundos."}), 429
     if not username or not password or not key:
         return jsonify({"success": False, "error": "Username, senha e key obrigat\u00f3rios"})
     if len(username) < 3 or len(username) > 20:
